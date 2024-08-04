@@ -60,6 +60,12 @@ impl Display for TokenType {
             TokenType::RightParen => write!(f, "RIGHT_PAREN"),
             TokenType::LeftBrace => write!(f, "LEFT_BRACE"),
             TokenType::RightBrace => write!(f, "RIGHT_BRACE"),
+            TokenType::Star => write!(f, "STAR"),
+            TokenType::Dot => write!(f, "DOT"),
+            TokenType::Comma => write!(f, "COMMA"),
+            TokenType::Plus => write!(f, "PLUS"),
+            TokenType::Minus => write!(f, "MINUS"),
+            TokenType::Semicolon => write!(f, "SEMICOLON"),
             TokenType::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
@@ -91,19 +97,6 @@ impl Display for Token {
     }
 }
 
-// fn tokenize(content: &str) {
-//     for char in content.chars() {
-//         match char {
-//             '(' => println!("LEFT_PAREN ( null"),
-//             ')' => println!("RIGHT_PAREN ) null"),
-//             '{' => println!("LEFT_BRACE {{ null"),
-//             '}' => println!("RIGHT_BRACE }} null"),
-//             _ => {}
-//         }
-//     }
-//     println!("EOF  null");
-// }
-
 fn scan(content: String) -> Vec<Token> {
     let lines: Vec<&str> = content.split("\n").collect();
     let mut tokens: Vec<Token> = Vec::new();
@@ -119,12 +112,20 @@ fn scan(content: String) -> Vec<Token> {
                 ")" => Some(TokenType::RightParen),
                 "{" => Some(TokenType::LeftBrace),
                 "}" => Some(TokenType::RightBrace),
+                "*" => Some(TokenType::Star),
+                "." => Some(TokenType::Dot),
+                "," => Some(TokenType::Comma),
+                "+" => Some(TokenType::Plus),
+                "-" => Some(TokenType::Minus),
+                ";" => Some(TokenType::Semicolon),
                 _ => None,
             };
 
             if let Some(token) = token_type {
                 tokens.push(Token::new(token, lookahead, line_nr, col));
                 lookahead = String::new();
+            } else {
+                panic!("unrecognized token type");
             }
         }
     }
