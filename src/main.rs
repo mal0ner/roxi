@@ -58,18 +58,20 @@ enum TokenType {
 impl Display for TokenType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TokenType::LeftParen => write!(f, "LEFT_PAREN"),
-            TokenType::RightParen => write!(f, "RIGHT_PAREN"),
-            TokenType::LeftBrace => write!(f, "LEFT_BRACE"),
-            TokenType::RightBrace => write!(f, "RIGHT_BRACE"),
-            TokenType::Star => write!(f, "STAR"),
-            TokenType::Dot => write!(f, "DOT"),
-            TokenType::Comma => write!(f, "COMMA"),
-            TokenType::Plus => write!(f, "PLUS"),
-            TokenType::Minus => write!(f, "MINUS"),
-            TokenType::Semicolon => write!(f, "SEMICOLON"),
-            TokenType::Slash => write!(f, "SLASH"),
-            TokenType::Eof => write!(f, "EOF"),
+            Self::LeftParen => write!(f, "LEFT_PAREN"),
+            Self::RightParen => write!(f, "RIGHT_PAREN"),
+            Self::LeftBrace => write!(f, "LEFT_BRACE"),
+            Self::RightBrace => write!(f, "RIGHT_BRACE"),
+            Self::Star => write!(f, "STAR"),
+            Self::Dot => write!(f, "DOT"),
+            Self::Comma => write!(f, "COMMA"),
+            Self::Plus => write!(f, "PLUS"),
+            Self::Minus => write!(f, "MINUS"),
+            Self::Semicolon => write!(f, "SEMICOLON"),
+            Self::Slash => write!(f, "SLASH"),
+            Self::Equal => write!(f, "EQUAL"),
+            Self::EqualEqual => write!(f, "EQUAL_EQUAL"),
+            Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
     }
@@ -134,8 +136,10 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
 
     for (line_nr, line) in lines.iter().enumerate() {
         let mut lookahead = String::new();
+        let mut chars = line.chars().peekable();
+        let mut col = 0;
 
-        for (col, c) in line.chars().enumerate() {
+        while let Some(c) = chars.next() {
             lookahead.push(c);
 
             let token_type = match lookahead.as_str() {
@@ -150,6 +154,14 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
                 "-" => Some(TokenType::Minus),
                 ";" => Some(TokenType::Semicolon),
                 "/" => Some(TokenType::Slash),
+                "=" => match chars.peek() {
+                    Some('=') => {
+                        chars.next();
+                        lookahead.push('=');
+                        Some(TokenType::EqualEqual)
+                    }
+                    _ => Some(TokenType::Equal),
+                },
                 _ => None,
             };
 
@@ -170,7 +182,45 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
                 exit_code = EXIT_LEXICAL_ERROR;
                 lookahead = String::new();
             }
+
+            col += 1;
         }
+        // for (col, c) in line.chars().enumerate() {
+        //     lookahead.push(c);
+        //
+        //     let token_type = match lookahead.as_str() {
+        //         "(" => Some(TokenType::LeftParen),
+        //         ")" => Some(TokenType::RightParen),
+        //         "{" => Some(TokenType::LeftBrace),
+        //         "}" => Some(TokenType::RightBrace),
+        //         "*" => Some(TokenType::Star),
+        //         "." => Some(TokenType::Dot),
+        //         "," => Some(TokenType::Comma),
+        //         "+" => Some(TokenType::Plus),
+        //         "-" => Some(TokenType::Minus),
+        //         ";" => Some(TokenType::Semicolon),
+        //         "/" => Some(TokenType::Slash),
+        //         _ => None,
+        //     };
+        //
+        //     if let Some(token) = token_type {
+        //         items.push(LexItem::Token(Token::new(
+        //             token,
+        //             lookahead,
+        //             line_nr + 1,
+        //             col,
+        //         )));
+        //         lookahead = String::new();
+        //     } else {
+        //         items.push(LexItem::Error(LexError {
+        //             line: line_nr + 1,
+        //             column: col,
+        //             message: format!("Unexpected character: {}", c),
+        //         }));
+        //         exit_code = EXIT_LEXICAL_ERROR;
+        //         lookahead = String::new();
+        //     }
+        // }
     }
 
     items.push(LexItem::Token(Token::new(
