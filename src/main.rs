@@ -73,6 +73,10 @@ impl Display for TokenType {
             Self::EqualEqual => write!(f, "EQUAL_EQUAL"),
             Self::Bang => write!(f, "BANG"),
             Self::BangEqual => write!(f, "BANG_EQUAL"),
+            Self::Less => write!(f, "LESS"),
+            Self::LessEqual => write!(f, "LESS_EQUAL"),
+            Self::Greater => write!(f, "GREATER"),
+            Self::GreaterEqual => write!(f, "GREATER_EQUAL"),
             Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
@@ -171,6 +175,22 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
                         Some(TokenType::BangEqual)
                     }
                     _ => Some(TokenType::Bang),
+                },
+                "<" => match chars.peek() {
+                    Some('=') => {
+                        chars.next();
+                        lookahead.push('=');
+                        Some(TokenType::LessEqual)
+                    }
+                    _ => Some(TokenType::Less),
+                },
+                ">" => match chars.peek() {
+                    Some('=') => {
+                        chars.next();
+                        lookahead.push('=');
+                        Some(TokenType::GreaterEqual)
+                    }
+                    _ => Some(TokenType::Greater),
                 },
                 _ => None,
             };
