@@ -140,7 +140,7 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
     let mut exit_code: i32 = 0;
     let mut items: Vec<LexItem> = Vec::new();
 
-    for (line_nr, line) in lines.iter().enumerate() {
+    'line_loop: for (line_nr, line) in lines.iter().enumerate() {
         let mut lookahead = String::new();
         let mut chars = line.chars().peekable();
         let mut col = 0;
@@ -159,7 +159,13 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
                 "+" => Some(TokenType::Plus),
                 "-" => Some(TokenType::Minus),
                 ";" => Some(TokenType::Semicolon),
-                "/" => Some(TokenType::Slash),
+                "/" => match chars.peek() {
+                    Some('/') => {
+                        // go to next line as this is a comment
+                        break 'line_loop;
+                    }
+                    _ => Some(TokenType::Slash),
+                },
                 "=" => match chars.peek() {
                     Some('=') => {
                         chars.next();
