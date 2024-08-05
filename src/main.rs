@@ -4,6 +4,8 @@ use std::fmt::Display;
 use std::fs;
 // use std::io::{self, Write};
 
+const EXIT_LEXICAL_ERROR: i32 = 65;
+
 #[allow(dead_code)]
 enum TokenType {
     LeftParen,
@@ -66,6 +68,7 @@ impl Display for TokenType {
             TokenType::Plus => write!(f, "PLUS"),
             TokenType::Minus => write!(f, "MINUS"),
             TokenType::Semicolon => write!(f, "SEMICOLON"),
+            TokenType::Slash => write!(f, "SLASH"),
             TokenType::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
@@ -97,9 +100,37 @@ impl Display for Token {
     }
 }
 
-fn scan(content: String) -> Vec<Token> {
+#[allow(dead_code)]
+struct LexError {
+    line: usize,
+    column: usize,
+    message: String,
+}
+
+impl Display for LexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[line {}] Error: {}", self.line, self.message)
+    }
+}
+
+enum LexItem {
+    Token(Token),
+    Error(LexError),
+}
+
+impl Display for LexItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LexItem::Token(token) => write!(f, "{}", token),
+            LexItem::Error(error) => write!(f, "{}", error),
+        }
+    }
+}
+
+fn scan(content: String) -> (Vec<LexItem>, i32) {
     let lines: Vec<&str> = content.split("\n").collect();
-    let mut tokens: Vec<Token> = Vec::new();
+    let mut exit_code: i32 = 0;
+    let mut items: Vec<LexItem> = Vec::new();
 
     for (line_nr, line) in lines.iter().enumerate() {
         let mut lookahead = String::new();
@@ -118,21 +149,38 @@ fn scan(content: String) -> Vec<Token> {
                 "+" => Some(TokenType::Plus),
                 "-" => Some(TokenType::Minus),
                 ";" => Some(TokenType::Semicolon),
+                "/" => Some(TokenType::Slash),
                 _ => None,
             };
 
             if let Some(token) = token_type {
-                tokens.push(Token::new(token, lookahead, line_nr, col));
+                items.push(LexItem::Token(Token::new(
+                    token,
+                    lookahead,
+                    line_nr + 1,
+                    col,
+                )));
                 lookahead = String::new();
             } else {
-                panic!("unrecognized token type");
+                items.push(LexItem::Error(LexError {
+                    line: line_nr + 1,
+                    column: col,
+                    message: format!("Unexpected character: {}", c),
+                }));
+                exit_code = EXIT_LEXICAL_ERROR;
+                lookahead = String::new();
             }
         }
     }
 
-    tokens.push(Token::new(TokenType::Eof, "".to_string(), 0, 0));
+    items.push(LexItem::Token(Token::new(
+        TokenType::Eof,
+        "".to_string(),
+        0,
+        0,
+    )));
 
-    tokens
+    (items, exit_code)
 }
 
 fn main() {
@@ -148,16 +196,19 @@ fn main() {
     match command.as_str() {
         "tokenize" => {
             // You can use print statements as follows for debugging, they'll be visible when running tests.
-            eprintln!("Logs from your program will appear here!");
 
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
                 eprintln!("Failed to read file {}", filename);
                 String::new()
             });
-            let tokens = scan(file_contents);
-            for token in tokens {
-                println!("{}", token);
+            let (items, exit_code) = scan(file_contents);
+            for item in items {
+                match item {
+                    LexItem::Token(_) => println!("{}", item),
+                    LexItem::Error(_) => eprintln!("{}", item),
+                }
             }
+            std::process::exit(exit_code);
         }
         _ => {
             eprintln!("Unknown command: {}", command);
