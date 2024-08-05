@@ -71,6 +71,8 @@ impl Display for TokenType {
             Self::Slash => write!(f, "SLASH"),
             Self::Equal => write!(f, "EQUAL"),
             Self::EqualEqual => write!(f, "EQUAL_EQUAL"),
+            Self::Bang => write!(f, "BANG"),
+            Self::BangEqual => write!(f, "BANG_EQUAL"),
             Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
@@ -161,6 +163,14 @@ fn scan(content: String) -> (Vec<LexItem>, i32) {
                         Some(TokenType::EqualEqual)
                     }
                     _ => Some(TokenType::Equal),
+                },
+                "!" => match chars.peek() {
+                    Some('=') => {
+                        chars.next();
+                        lookahead.push('=');
+                        Some(TokenType::BangEqual)
+                    }
+                    _ => Some(TokenType::Bang),
                 },
                 _ => None,
             };
