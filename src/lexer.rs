@@ -197,7 +197,7 @@ impl Lexer {
             .get(lexeme)
             .cloned()
             .unwrap_or(TokenType::Identifier);
-        self.add_token(token_type, Some(lexeme.to_string()));
+        self.add_token(token_type, None);
     }
 
     fn number(&mut self) {
@@ -215,9 +215,8 @@ impl Lexer {
         //TODO: Add Lex error for invalid tokens within a number?
 
         let mut literal = self.source[self.start..self.current].to_string();
-        if !literal.contains('.') {
-            literal = format!("{}.0", literal);
-        }
+        let number: f64 = literal.parse().unwrap_or(0.0);
+        literal = format!("{:?}", number);
         self.add_token(TokenType::Number, Some(literal));
     }
 
@@ -358,6 +357,7 @@ impl Display for TokenType {
             Self::GreaterEqual => write!(f, "GREATER_EQUAL"),
             Self::String => write!(f, "STRING"),
             Self::Number => write!(f, "NUMBER"),
+            Self::Identifier => write!(f, "IDENTIFIER"),
             Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
