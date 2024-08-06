@@ -212,7 +212,12 @@ impl Lexer {
             }
         }
 
-        let literal = self.source[self.start..self.current].to_string();
+        //TODO: Add Lex error for invalid tokens within a number?
+
+        let mut literal = self.source[self.start..self.current].to_string();
+        if !literal.contains('.') {
+            literal = format!("{}.0", literal);
+        }
         self.add_token(TokenType::Number, Some(literal));
     }
 
@@ -352,6 +357,7 @@ impl Display for TokenType {
             Self::Greater => write!(f, "GREATER"),
             Self::GreaterEqual => write!(f, "GREATER_EQUAL"),
             Self::String => write!(f, "STRING"),
+            Self::Number => write!(f, "NUMBER"),
             Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
