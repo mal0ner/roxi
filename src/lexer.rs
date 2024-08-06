@@ -45,6 +45,7 @@ lazy_static! {
 pub struct Token {
     token_type: TokenType,
     lexeme: String,
+    literal: Option<String>,
     line: usize,
     column: usize,
 }
@@ -138,6 +139,7 @@ impl Lexer {
         self.tokens.push(Token::new(
             TokenType::Eof,
             String::new(),
+            None,
             self.line,
             self.current,
         ));
@@ -153,12 +155,12 @@ impl Lexer {
         match c {
             ' ' | '\r' | '\t' => {}
             '\n' => self.line += 1,
-            '"' => self.string(),
+            '"' => exit_code = self.string(),
             '/' => {
                 if self.match_char('/') {
                     self.advance_newline();
                 } else {
-                    self.add_token(Slash)
+                    self.add_token(Slash, None)
                 }
             }
             '!' => self.match_next_add('=', BangEqual, Bang),
@@ -167,7 +169,7 @@ impl Lexer {
             '>' => self.match_next_add('=', GreaterEqual, Greater),
             _ => {
                 if let Some(token_type) = SINGLE_CHAR_TOKENS.get(&c) {
-                    self.add_token(token_type.clone());
+                    self.add_token(token_type.clone(), None);
                 } else if c.is_ascii_digit() {
                     self.number();
                 } else if c.is_ascii_alphabetic() || c == '_' {
@@ -195,7 +197,7 @@ impl Lexer {
             .get(lexeme)
             .cloned()
             .unwrap_or(TokenType::Identifier);
-        self.add_token(token_type);
+        self.add_token(token_type, Some(lexeme.to_string()));
     }
 
     fn number(&mut self) {
@@ -210,10 +212,12 @@ impl Lexer {
             }
         }
 
-        self.add_token(TokenType::Number);
+        let literal = self.source[self.start..self.current].to_string();
+        self.add_token(TokenType::Number, Some(literal));
     }
 
-    fn string(&mut self) {
+    fn string(&mut self) -> i32 {
+        let mut exit_code = 0;
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -227,10 +231,17 @@ impl Lexer {
                 column: self.current,
                 message: "Unterminated string.".to_string(),
             });
+            exit_code = EXIT_LEXICAL_ERROR;
+
+            return exit_code; // exit without advancing on unterminated str
         }
 
         self.advance(); // closing "
-        self.add_token(TokenType::String);
+
+        // trim quotes for literal
+        let literal = self.source[self.start + 1..self.current - 1].to_string();
+        self.add_token(TokenType::String, Some(literal));
+        exit_code
     }
 
     fn match_char(&mut self, expected: char) -> bool {
@@ -243,9 +254,9 @@ impl Lexer {
 
     fn match_next_add(&mut self, c: char, if_match: TokenType, if_not: TokenType) {
         if self.match_char(c) {
-            self.add_token(if_match);
+            self.add_token(if_match, None);
         } else {
-            self.add_token(if_not);
+            self.add_token(if_not, None);
         }
     }
 
@@ -279,18 +290,26 @@ impl Lexer {
         }
     }
 
-    fn add_token(&mut self, token_type: TokenType) {
+    fn add_token(&mut self, token_type: TokenType, literal: Option<String>) {
         let lexeme = self.source[self.start..self.current].to_string();
-        self.tokens
-            .push(Token::new(token_type, lexeme, self.line, self.start));
+        self.tokens.push(Token::new(
+            token_type, lexeme, literal, self.line, self.start,
+        ));
     }
 }
 
 impl Token {
-    pub fn new(token_type: TokenType, lexeme: String, line: usize, column: usize) -> Self {
+    pub fn new(
+        token_type: TokenType,
+        lexeme: String,
+        literal: Option<String>,
+        line: usize,
+        column: usize,
+    ) -> Self {
         Self {
             token_type,
             lexeme,
+            literal,
             line,
             column,
         }
@@ -299,7 +318,8 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} null", self.token_type, self.lexeme)
+        let literal = self.literal.as_deref().unwrap_or("null");
+        write!(f, "{} {} {}", self.token_type, self.lexeme, literal)
     }
 }
 
@@ -331,6 +351,7 @@ impl Display for TokenType {
             Self::LessEqual => write!(f, "LESS_EQUAL"),
             Self::Greater => write!(f, "GREATER"),
             Self::GreaterEqual => write!(f, "GREATER_EQUAL"),
+            Self::String => write!(f, "STRING"),
             Self::Eof => write!(f, "EOF"),
             _ => panic!("not implemented"),
         }
