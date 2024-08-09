@@ -41,13 +41,13 @@ lazy_static! {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
-    token_type: TokenType,
-    lexeme: String,
-    literal: Option<String>,
-    line: usize,
-    column: usize,
+    pub token_type: TokenType,
+    pub lexeme: String,
+    pub literal: Option<String>,
+    pub line: usize,
+    pub column: usize,
 }
 
 #[allow(dead_code)]
@@ -282,12 +282,14 @@ impl Lexer {
         self.current >= self.source.len()
     }
 
+    // return next character
     fn advance(&mut self) -> char {
         let c = self.source.chars().nth(self.current).unwrap_or('\0');
         self.current += 1;
         c
     }
 
+    // advance to first character in new line, or EOF
     fn advance_newline(&mut self) {
         while self.peek() != '\n' && !self.is_at_end() {
             self.advance();
