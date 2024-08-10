@@ -7,6 +7,9 @@ use std::fs;
 
 use crate::{lexer::Lexer, parser::Parser};
 
+const EXIT_OK: i32 = 0;
+const EXIT_FAILURE: i32 = 65;
+
 fn tokenize(filename: &str) {
     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
         eprintln!("Failed to read file {}", filename);
@@ -31,17 +34,28 @@ fn parse(filename: &str) {
 
     if !file_contents.is_empty() {
         let mut lex = Lexer::new(file_contents);
-        let (tokens, _, exit_code) = lex.scan_tokens();
+        let mut exit_code: i32 = EXIT_OK;
+        let (tokens, _, exit_lexer) = lex.scan_tokens();
+        exit_code = exit_code.max(exit_lexer);
 
-        let parser = Parser::new(tokens);
+        let mut parser = Parser::new(tokens);
 
         match parser.parse() {
-            Some(exs) => {
-                for e in exs {
-                    println!("{}", e);
+            Ok((expressions, errors)) => {
+                for ex in expressions {
+                    println!("{}", ex);
+                }
+                if !errors.is_empty() {
+                    exit_code = exit_code.max(EXIT_FAILURE);
+                }
+                for err in errors {
+                    eprintln!("{}", err);
                 }
             }
-            None => eprintln!("No expressions to parse"),
+            Err(e) => {
+                exit_code = exit_code.max(EXIT_FAILURE);
+                eprintln!("{}", e);
+            }
         }
         std::process::exit(exit_code);
     }
