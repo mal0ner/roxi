@@ -48,6 +48,7 @@ impl Parser {
                 TokenType::False => Ok(Expr::Bool(false)),
                 TokenType::Nil => Ok(Expr::Nil),
                 TokenType::Number => self.number(token),
+                TokenType::String => self.string(token),
                 TokenType::Eof => return Ok((exprs, errors)),
                 _ => todo!(),
             };
@@ -75,6 +76,15 @@ impl Parser {
         match parse_number_from_tok_literal(token.literal.clone()) {
             Ok(n) => Ok(Expr::Number(n)),
             Err(e) => Err(e),
+        }
+    }
+
+    fn string(&self, token: &Token) -> Result<Expr, ParseError> {
+        match token.literal.clone() {
+            Some(s) => Ok(Expr::String(s)),
+            None => Err(ParseError::Fatal(
+                "missing token string literal".to_string(),
+            )),
         }
     }
 }

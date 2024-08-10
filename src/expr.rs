@@ -4,30 +4,30 @@ use crate::lexer::Token;
 
 #[allow(dead_code, clippy::vec_box)]
 #[derive(Debug)]
-pub enum Expr<'a> {
+pub enum Expr {
     Bool(bool),
     Nil,
     Number(f64),
-    String(&'a str),
+    String(String),
     Unary {
         operator: Token,
-        right: Box<Expr<'a>>,
+        right: Box<Expr>,
     },
     Binary {
         operator: Token,
-        left: Box<Expr<'a>>,
-        right: Box<Expr<'a>>,
+        left: Box<Expr>,
+        right: Box<Expr>,
     },
-    Grouping(Vec<Box<Expr<'a>>>),
+    Grouping(Vec<Box<Expr>>),
 }
 
-impl<'a> Display for Expr<'a> {
+impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expr::Bool(b) => write!(f, "{}", b),
             Expr::Nil => write!(f, "nil"),
             Expr::Number(n) => write!(f, "{:?}", n),
-            Expr::String(s) => write!(f, "{:?}", s),
+            Expr::String(s) => write!(f, "{}", s),
             Expr::Unary { operator, right } => {
                 write!(f, "{} {}", operator.lexeme, right)
             }
