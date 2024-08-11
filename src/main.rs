@@ -41,16 +41,8 @@ fn parse(filename: &str) {
         let mut parser = Parser::new(tokens);
 
         match parser.parse() {
-            Ok((expressions, errors)) => {
-                for ex in expressions {
-                    println!("{}", ex);
-                }
-                if !errors.is_empty() {
-                    exit_code = exit_code.max(EXIT_FAILURE);
-                }
-                for err in errors {
-                    eprintln!("{}", err);
-                }
+            Ok(expr) => {
+                println!("{}", expr);
             }
             Err(e) => {
                 exit_code = exit_code.max(EXIT_FAILURE);

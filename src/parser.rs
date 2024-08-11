@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::{
-    expr::Expr,
-    lexer::{Token, TokenType},
-};
+use crate::{expr::Expr, lexer::Token};
 
 #[allow(dead_code)]
 pub struct Parser {
@@ -13,12 +10,9 @@ pub struct Parser {
 }
 
 #[derive(Debug, Clone)]
-pub enum ParseError {
-    NonFatal(String),
-    Fatal(String),
+pub struct ParseError {
+    message: String,
 }
-
-impl std::error::Error for ParseError {}
 
 impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
@@ -29,80 +23,62 @@ impl Parser {
         }
     }
 
-    /// Returns either a vec of parsed expressions and non-fatal/skippable errors, or a single fatal error
-    /// that would cause a panic.
-    pub fn parse(&mut self) -> Result<(Vec<Expr>, Vec<ParseError>), ParseError> {
-        let mut errors: Vec<ParseError> = Vec::new();
-        let mut exprs: Vec<Expr> = Vec::new();
-        if self.tokens.is_empty() {
-            let error = ParseError::Fatal("no tokens in token stream".to_string());
-            errors.push(error.clone());
-            return Err(error.clone());
-        }
+    pub fn parse(&mut self) -> Result<Expr, ParseError> {
+        self.expression()
+    }
 
-        let tokens = self.tokens.iter().peekable();
-
-        for token in tokens {
-            let expr: Result<Expr, ParseError> = match token.token_type {
-                TokenType::True => Ok(Expr::Bool(true)),
-                TokenType::False => Ok(Expr::Bool(false)),
-                TokenType::Nil => Ok(Expr::Nil),
-                TokenType::Number => self.number(token),
-                TokenType::String => self.string(token),
-                TokenType::Eof => return Ok((exprs, errors)),
-                _ => todo!(),
-            };
-
-            match expr {
-                Ok(x) => exprs.push(x),
-                Err(e) => {
-                    // I have failed...
-                    // but how badly...
-                    match e {
-                        ParseError::NonFatal(_) => errors.push(e),
-                        // Exit early (PANIC) upon fatal/unrecoverable error
-                        ParseError::Fatal(_) => {
-                            return Err(e);
-                        }
-                    }
-                }
+    fn primary(&mut self) -> Result<Expr, ParseError> {
+        match self.peek() {
+            Token::True | Token::False | Token::Nil | Token::Number(_) | Token::String(_) => {
+                Ok(Expr::Literal(self.advance()))
             }
-        }
-
-        Ok((exprs, errors))
-    }
-
-    fn number(&self, token: &Token) -> Result<Expr, ParseError> {
-        match parse_number_from_tok_literal(token.literal.clone()) {
-            Ok(n) => Ok(Expr::Number(n)),
-            Err(e) => Err(e),
-        }
-    }
-
-    fn string(&self, token: &Token) -> Result<Expr, ParseError> {
-        match token.literal.clone() {
-            Some(s) => Ok(Expr::String(s)),
-            None => Err(ParseError::Fatal(
-                "missing token string literal".to_string(),
-            )),
+            Token::LeftParen => {
+                self.advance();
+                let expr = self.expression()?; // consume interior expr
+                if !self.matches(Token::RightParen) {
+                    return Err(ParseError {
+                        message: "Unmatched parentheses.".to_string(),
+                    });
+                }
+                self.advance();
+                Ok(Expr::Grouping(Box::new(expr)))
+            }
+            _ => Err(ParseError {
+                message: "missing expression.".to_string(),
+            }),
         }
     }
-}
 
-fn parse_number_from_tok_literal(number: Option<String>) -> Result<f64, ParseError> {
-    match number {
-        Some(s) => s
-            .parse::<f64>()
-            .map_err(|_| ParseError::NonFatal("invalid number literal".to_string())),
-        None => Err(ParseError::NonFatal("missing number literal".to_string())),
+    fn expression(&mut self) -> Result<Expr, ParseError> {
+        self.primary()
+    }
+
+    fn advance(&mut self) -> Token {
+        if !self.is_at_end() {
+            self.current += 1;
+        }
+        self.previous()
+    }
+
+    fn matches(&self, expected: Token) -> bool {
+        expected == *self.peek()
+    }
+
+    fn is_at_end(&self) -> bool {
+        self.current >= self.tokens.len()
+    }
+
+    fn peek(&self) -> &Token {
+        &self.tokens[self.current]
+    }
+
+    fn previous(&self) -> Token {
+        self.tokens[self.current - 1].clone()
     }
 }
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::NonFatal(msg) => write!(f, "Non-fatal parse error: {}", msg),
-            ParseError::Fatal(msg) => write!(f, "Fatal Parse Error: {}", msg),
-        }
+        write!(f, "Error: {}", self.message)
     }
 }

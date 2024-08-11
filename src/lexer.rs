@@ -3,56 +3,82 @@ use std::{collections::HashMap, fmt::Display};
 
 const EXIT_LEXICAL_ERROR: i32 = 65;
 
+const LEFT_PAREN: char = '(';
+const RIGHT_PAREN: char = ')';
+const LEFT_BRACE: char = '{';
+const RIGHT_BRACE: char = '}';
+const COMMA: char = ',';
+const DOT: char = '.';
+const MINUS: char = '-';
+const PLUS: char = '+';
+const SEMICOLON: char = ';';
+const SLASH: char = '/';
+const STAR: char = '*';
+const BANG: char = '!';
+const BANG_EQUAL: &str = "!=";
+const EQUAL: char = '=';
+const EQUAL_EQUAL: &str = "==";
+const GREATER: char = '>';
+const GREATER_EQUAL: &str = ">=";
+const LESS: char = '<';
+const LESS_EQUAL: &str = "<=";
+const AND: &str = "and";
+const CLASS: &str = "class";
+const ELSE: &str = "else";
+const FALSE: &str = "false";
+const FUN: &str = "fun";
+const FOR: &str = "for";
+const IF: &str = "if";
+const NIL: &str = "nil";
+const OR: &str = "or";
+const PRINT: &str = "print";
+const RETURN: &str = "return";
+const SUPER: &str = "super";
+const THIS: &str = "this";
+const TRUE: &str = "true";
+const VAR: &str = "var";
+const WHILE: &str = "while";
+
 lazy_static! {
-    static ref SINGLE_CHAR_TOKENS: HashMap<char, TokenType> = {
+    static ref SINGLE_CHAR_TOKENS: HashMap<char, Token> = {
         let mut m = HashMap::new();
-        m.insert('(', TokenType::LeftParen);
-        m.insert(')', TokenType::RightParen);
-        m.insert('{', TokenType::LeftBrace);
-        m.insert('}', TokenType::RightBrace);
-        m.insert(',', TokenType::Comma);
-        m.insert('.', TokenType::Dot);
-        m.insert('-', TokenType::Minus);
-        m.insert('+', TokenType::Plus);
-        m.insert(';', TokenType::Semicolon);
-        m.insert('*', TokenType::Star);
+        m.insert('(', Token::LeftParen);
+        m.insert(')', Token::RightParen);
+        m.insert('{', Token::LeftBrace);
+        m.insert('}', Token::RightBrace);
+        m.insert(',', Token::Comma);
+        m.insert('.', Token::Dot);
+        m.insert('-', Token::Minus);
+        m.insert('+', Token::Plus);
+        m.insert(';', Token::Semicolon);
+        m.insert('*', Token::Star);
         m
     };
-    static ref KEYWORDS: HashMap<&'static str, TokenType> = {
+    static ref KEYWORDS: HashMap<&'static str, Token> = {
         let mut m = HashMap::new();
-        m.insert("and", TokenType::And);
-        m.insert("class", TokenType::Class);
-        m.insert("else", TokenType::Else);
-        m.insert("false", TokenType::False);
-        m.insert("for", TokenType::For);
-        m.insert("fun", TokenType::Fun);
-        m.insert("if", TokenType::If);
-        m.insert("nil", TokenType::Nil);
-        m.insert("or", TokenType::Or);
-        m.insert("print", TokenType::Print);
-        m.insert("return", TokenType::Return);
-        m.insert("super", TokenType::Super);
-        m.insert("this", TokenType::This);
-        m.insert("true", TokenType::True);
-        m.insert("var", TokenType::Var);
-        m.insert("while", TokenType::While);
+        m.insert("and", Token::And);
+        m.insert("class", Token::Class);
+        m.insert("else", Token::Else);
+        m.insert("false", Token::False);
+        m.insert("for", Token::For);
+        m.insert("fun", Token::Fun);
+        m.insert("if", Token::If);
+        m.insert("nil", Token::Nil);
+        m.insert("or", Token::Or);
+        m.insert("print", Token::Print);
+        m.insert("return", Token::Return);
+        m.insert("super", Token::Super);
+        m.insert("this", Token::This);
+        m.insert("true", Token::True);
+        m.insert("var", Token::Var);
+        m.insert("while", Token::While);
         m
     };
 }
 
 #[allow(dead_code)]
-#[derive(Clone, Debug)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub lexeme: String,
-    pub literal: Option<String>,
-    pub line: usize,
-    pub column: usize,
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone)]
-pub enum TokenType {
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum Token {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -76,9 +102,9 @@ pub enum TokenType {
     LessEqual,
 
     // Identifiers
-    Identifier,
-    String,
-    Number,
+    Identifier(String),
+    String(String),
+    Number(String),
 
     // Keywords,
     And,
@@ -97,6 +123,8 @@ pub enum TokenType {
     True,
     Var,
     While,
+
+    // END
     Eof,
 }
 
@@ -110,7 +138,7 @@ pub struct LexError {
 
 pub struct Lexer {
     source: String,
-    tokens: Vec<Token>,
+    token_type: Vec<Token>,
     errors: Vec<LexError>,
     start: usize, //token start offset
     current: usize,
@@ -121,8 +149,8 @@ impl Lexer {
     pub fn new(source: String) -> Self {
         Lexer {
             source,
-            tokens: Vec::new(),
             errors: Vec::new(),
+            token_type: Vec::new(),
             start: 0,
             current: 0,
             line: 1,
@@ -136,19 +164,13 @@ impl Lexer {
             exit_code = exit_code.max(self.scan_token());
         }
 
-        self.tokens.push(Token::new(
-            TokenType::Eof,
-            String::new(),
-            None,
-            self.line,
-            self.current,
-        ));
+        self.token_type.push(Token::Eof);
 
-        (self.tokens.clone(), self.errors.clone(), exit_code)
+        (self.token_type.clone(), self.errors.clone(), exit_code)
     }
 
     fn scan_token(&mut self) -> i32 {
-        use TokenType::*;
+        use Token::*;
 
         let mut exit_code: i32 = 0;
         let c = self.advance();
@@ -160,7 +182,7 @@ impl Lexer {
                 if self.match_char('/') {
                     self.advance_newline();
                 } else {
-                    self.add_token(Slash, None)
+                    self.token_type.push(Token::Slash)
                 }
             }
             '!' => self.match_next_add('=', BangEqual, Bang),
@@ -169,7 +191,7 @@ impl Lexer {
             '>' => self.match_next_add('=', GreaterEqual, Greater),
             _ => {
                 if let Some(token_type) = SINGLE_CHAR_TOKENS.get(&c) {
-                    self.add_token(token_type.clone(), None);
+                    self.token_type.push(token_type.clone());
                 } else if c.is_ascii_digit() {
                     self.number();
                 } else if c.is_ascii_alphabetic() || c == '_' {
@@ -196,8 +218,11 @@ impl Lexer {
         let token_type = KEYWORDS
             .get(lexeme)
             .cloned()
-            .unwrap_or(TokenType::Identifier);
-        self.add_token(token_type, None);
+            .unwrap_or(Token::Identifier("".to_string()));
+        match token_type {
+            Token::Identifier(_) => self.token_type.push(Token::Identifier(lexeme.to_string())),
+            _ => self.token_type.push(token_type),
+        }
     }
 
     fn number(&mut self) {
@@ -214,10 +239,8 @@ impl Lexer {
 
         //TODO: Add Lex error for invalid tokens within a number?
 
-        let mut literal = self.source[self.start..self.current].to_string();
-        let number: f64 = literal.parse().unwrap_or(0.0);
-        literal = format!("{:?}", number);
-        self.add_token(TokenType::Number, Some(literal));
+        let literal = self.source[self.start..self.current].to_string();
+        self.token_type.push(Token::Number(literal));
     }
 
     fn string(&mut self) -> i32 {
@@ -244,7 +267,7 @@ impl Lexer {
 
         // trim quotes for literal
         let literal = self.source[self.start + 1..self.current - 1].to_string();
-        self.add_token(TokenType::String, Some(literal));
+        self.token_type.push(Token::String(literal));
         exit_code
     }
 
@@ -256,11 +279,11 @@ impl Lexer {
         true
     }
 
-    fn match_next_add(&mut self, c: char, if_match: TokenType, if_not: TokenType) {
+    fn match_next_add(&mut self, c: char, if_match: Token, if_not: Token) {
         if self.match_char(c) {
-            self.add_token(if_match, None);
+            self.token_type.push(if_match);
         } else {
-            self.add_token(if_not, None);
+            self.token_type.push(if_not);
         }
     }
 
@@ -295,37 +318,103 @@ impl Lexer {
             self.advance();
         }
     }
-
-    fn add_token(&mut self, token_type: TokenType, literal: Option<String>) {
-        let lexeme = self.source[self.start..self.current].to_string();
-        self.tokens.push(Token::new(
-            token_type, lexeme, literal, self.line, self.start,
-        ));
-    }
 }
 
 impl Token {
-    pub fn new(
-        token_type: TokenType,
-        lexeme: String,
-        literal: Option<String>,
-        line: usize,
-        column: usize,
-    ) -> Self {
-        Self {
-            token_type,
-            lexeme,
-            literal,
-            line,
-            column,
+    fn token_type(&self) -> String {
+        match self {
+            Token::LeftParen => "LEFT_PAREN".to_string(),
+            Token::RightParen => "RIGHT_PAREN".to_string(),
+            Token::LeftBrace => "LEFT_BRACE".to_string(),
+            Token::RightBrace => "RIGHT_BRACE".to_string(),
+            Token::Comma => "COMMA".to_string(),
+            Token::Dot => "DOT".to_string(),
+            Token::Minus => "MINUS".to_string(),
+            Token::Plus => "PLUS".to_string(),
+            Token::Semicolon => "SEMICOLON".to_string(),
+            Token::Slash => "SLASH".to_string(),
+            Token::Star => "STAR".to_string(),
+            Token::Bang => "BANG".to_string(),
+            Token::BangEqual => "BANG_EQUAL".to_string(),
+            Token::Equal => "EQUAL".to_string(),
+            Token::EqualEqual => "EQUAL_EQUAL".to_string(),
+            Token::Greater => "GREATER".to_string(),
+            Token::GreaterEqual => "GREATER_EQUAL".to_string(),
+            Token::Less => "LESS".to_string(),
+            Token::LessEqual => "LESS_EQUAL".to_string(),
+            Token::Identifier(_) => "IDENTIFIER".to_string(),
+            Token::String(_) => "STRING".to_string(),
+            Token::Number(_) => "NUMBER".to_string(),
+            Token::And => "AND".to_string(),
+            Token::Class => "CLASS".to_string(),
+            Token::Else => "ELSE".to_string(),
+            Token::False => "FALSE".to_string(),
+            Token::Fun => "FUN".to_string(),
+            Token::For => "FOR".to_string(),
+            Token::If => "IF".to_string(),
+            Token::Nil => "NIL".to_string(),
+            Token::Or => "OR".to_string(),
+            Token::Print => "PRINT".to_string(),
+            Token::Return => "RETURN".to_string(),
+            Token::Super => "SUPER".to_string(),
+            Token::This => "THIS".to_string(),
+            Token::True => "TRUE".to_string(),
+            Token::Var => "VAR".to_string(),
+            Token::While => "WHILE".to_string(),
+            Token::Eof => "EOF".to_string(),
         }
     }
-}
 
-impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let literal = self.literal.as_deref().unwrap_or("null");
-        write!(f, "{} {} {}", self.token_type, self.lexeme, literal)
+    pub fn lexeme(&self) -> String {
+        match self {
+            Token::LeftParen => LEFT_PAREN.to_string(),
+            Token::RightParen => RIGHT_PAREN.to_string(),
+            Token::LeftBrace => LEFT_BRACE.to_string(),
+            Token::RightBrace => RIGHT_BRACE.to_string(),
+            Token::Comma => COMMA.to_string(),
+            Token::Dot => DOT.to_string(),
+            Token::Minus => MINUS.to_string(),
+            Token::Plus => PLUS.to_string(),
+            Token::Semicolon => SEMICOLON.to_string(),
+            Token::Slash => SLASH.to_string(),
+            Token::Star => STAR.to_string(),
+            Token::Bang => BANG.to_string(),
+            Token::BangEqual => BANG_EQUAL.to_string(),
+            Token::Equal => EQUAL.to_string(),
+            Token::EqualEqual => EQUAL_EQUAL.to_string(),
+            Token::Greater => GREATER.to_string(),
+            Token::GreaterEqual => GREATER_EQUAL.to_string(),
+            Token::Less => LESS.to_string(),
+            Token::LessEqual => LESS_EQUAL.to_string(),
+            Token::Identifier(identifier) => identifier.to_string(),
+            Token::String(string) => format!("\"{}\"", string),
+            Token::Number(number) => number.to_string(),
+            Token::And => AND.to_string(),
+            Token::Class => CLASS.to_string(),
+            Token::Else => ELSE.to_string(),
+            Token::False => FALSE.to_string(),
+            Token::Fun => FUN.to_string(),
+            Token::For => FOR.to_string(),
+            Token::If => IF.to_string(),
+            Token::Nil => NIL.to_string(),
+            Token::Or => OR.to_string(),
+            Token::Print => PRINT.to_string(),
+            Token::Return => RETURN.to_string(),
+            Token::Super => SUPER.to_string(),
+            Token::This => THIS.to_string(),
+            Token::True => TRUE.to_string(),
+            Token::Var => VAR.to_string(),
+            Token::While => WHILE.to_string(),
+            Token::Eof => "".to_string(),
+        }
+    }
+
+    pub fn literal(&self) -> String {
+        match self {
+            Token::String(string) => string.to_string(),
+            Token::Number(number) => format!("{:?}", number.parse::<f64>().unwrap()),
+            _ => "null".to_string(),
+        }
     }
 }
 
@@ -335,48 +424,14 @@ impl Display for LexError {
     }
 }
 
-impl Display for TokenType {
+impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::LeftParen => write!(f, "LEFT_PAREN"),
-            Self::RightParen => write!(f, "RIGHT_PAREN"),
-            Self::LeftBrace => write!(f, "LEFT_BRACE"),
-            Self::RightBrace => write!(f, "RIGHT_BRACE"),
-            Self::Star => write!(f, "STAR"),
-            Self::Dot => write!(f, "DOT"),
-            Self::Comma => write!(f, "COMMA"),
-            Self::Plus => write!(f, "PLUS"),
-            Self::Minus => write!(f, "MINUS"),
-            Self::Semicolon => write!(f, "SEMICOLON"),
-            Self::Slash => write!(f, "SLASH"),
-            Self::Equal => write!(f, "EQUAL"),
-            Self::EqualEqual => write!(f, "EQUAL_EQUAL"),
-            Self::Bang => write!(f, "BANG"),
-            Self::BangEqual => write!(f, "BANG_EQUAL"),
-            Self::Less => write!(f, "LESS"),
-            Self::LessEqual => write!(f, "LESS_EQUAL"),
-            Self::Greater => write!(f, "GREATER"),
-            Self::GreaterEqual => write!(f, "GREATER_EQUAL"),
-            Self::String => write!(f, "STRING"),
-            Self::Number => write!(f, "NUMBER"),
-            Self::Identifier => write!(f, "IDENTIFIER"),
-            Self::And => write!(f, "AND"),
-            Self::Class => write!(f, "CLASS"),
-            Self::Else => write!(f, "ELSE"),
-            Self::False => write!(f, "FALSE"),
-            Self::Fun => write!(f, "FUN"),
-            Self::For => write!(f, "FOR"),
-            Self::If => write!(f, "IF"),
-            Self::Nil => write!(f, "NIL"),
-            Self::Or => write!(f, "OR"),
-            Self::Print => write!(f, "PRINT"),
-            Self::Return => write!(f, "RETURN"),
-            Self::Super => write!(f, "SUPER"),
-            Self::This => write!(f, "THIS"),
-            Self::True => write!(f, "TRUE"),
-            Self::Var => write!(f, "VAR"),
-            Self::While => write!(f, "WHILE"),
-            Self::Eof => write!(f, "EOF"),
-        }
+        write!(
+            f,
+            "{} {} {}",
+            self.token_type(),
+            self.lexeme(),
+            self.literal()
+        )
     }
 }
