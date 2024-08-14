@@ -28,28 +28,42 @@ impl Parser {
     }
 
     fn primary(&mut self) -> Result<Expr, ParseError> {
-        match self.peek() {
-            Token::True | Token::False | Token::Nil | Token::Number(_) | Token::String(_) => {
-                Ok(Expr::Literal(self.advance()))
-            }
-            Token::LeftParen => {
-                self.advance();
-                let expr = self.expression()?; // consume interior expr
-                if !self.matches(Token::RightParen) {
-                    return Err(ParseError {
-                        message: "Unmatched parentheses.".to_string(),
-                    });
-                }
-                self.advance();
-                Ok(Expr::Grouping(Box::new(expr)))
-            }
-            _ => Err(ParseError {
-                message: "missing expression.".to_string(),
-            }),
+        if matches!(
+            self.peek(),
+            Token::True | Token::False | Token::Nil | Token::Number(_) | Token::String(_)
+        ) {
+            return Ok(Expr::Literal(self.advance()));
         }
+        if matches!(self.peek(), Token::LeftParen) {
+            self.advance();
+            let expr = self.expression()?; // consume interior expr
+            if !self.matches(Token::RightParen) {
+                return Err(ParseError {
+                    message: "Unmatched parentheses.".to_string(),
+                });
+            }
+            self.advance();
+            return Ok(Expr::Grouping(Box::new(expr)));
+        }
+
+        Err(ParseError {
+            message: "missing expression".to_string(),
+        })
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
+        self.unary()
+    }
+
+    fn unary(&mut self) -> Result<Expr, ParseError> {
+        if matches!(self.peek(), Token::Minus | Token::Bang) {
+            let operator = self.advance();
+            let rhs = self.unary()?;
+            return Ok(Expr::Unary {
+                operator,
+                right: Box::new(rhs),
+            });
+        }
         self.primary()
     }
 

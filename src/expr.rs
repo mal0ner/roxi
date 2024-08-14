@@ -26,7 +26,7 @@ impl Display for Expr {
             }
             Expr::Literal(val) => write!(f, "{}", val.lexeme()),
             Expr::Unary { operator, right } => {
-                write!(f, "{} {}", operator.lexeme(), right)
+                write!(f, "({} {})", operator.lexeme(), right)
             }
             Expr::Binary {
                 operator,
