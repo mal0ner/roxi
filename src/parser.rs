@@ -52,7 +52,7 @@ impl Parser {
     }
 
     fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.factor()
+        self.term()
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
@@ -67,15 +67,29 @@ impl Parser {
         self.primary()
     }
 
+    fn term(&mut self) -> Result<Expr, ParseError> {
+        let mut expr = self.factor()?;
+        while matches!(self.peek(), Token::Plus | Token::Minus) {
+            let operator = self.advance();
+            let right = self.factor()?;
+            expr = Expr::Binary {
+                operator,
+                left: Box::new(expr),
+                right: Box::new(right),
+            };
+        }
+        Ok(expr)
+    }
+
     fn factor(&mut self) -> Result<Expr, ParseError> {
         let mut expr = self.unary()?;
         while matches!(self.peek(), Token::Slash | Token::Star) {
             let operator = self.advance();
-            let rhs = self.unary()?;
+            let right = self.unary()?;
             expr = Expr::Binary {
                 operator,
                 left: Box::new(expr),
-                right: Box::new(rhs),
+                right: Box::new(right),
             };
         }
         Ok(expr)
