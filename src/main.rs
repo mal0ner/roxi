@@ -1,9 +1,12 @@
+mod eval;
 mod expr;
 mod lexer;
 mod parser;
 
 use std::env;
 use std::fs;
+
+use eval::Evaluator;
 
 use crate::{lexer::Lexer, parser::Parser};
 
@@ -53,6 +56,34 @@ fn parse(filename: &str) {
     }
 }
 
+fn evaluate(filename: &str) {
+    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+        eprintln!("Failed to read file {}", filename);
+        String::new()
+    });
+
+    if !file_contents.is_empty() {
+        let mut lex = Lexer::new(file_contents);
+        let mut exit_code: i32 = EXIT_OK;
+        let (tokens, _, exit_lexer) = lex.scan_tokens();
+        exit_code = exit_code.max(exit_lexer);
+
+        let mut parser = Parser::new(tokens);
+
+        match parser.parse() {
+            Ok(expr) => {
+                let evaluator = Evaluator::new(Box::new(expr));
+                exit_code = exit_code.max(evaluator.evaluate());
+            }
+            Err(e) => {
+                exit_code = exit_code.max(EXIT_FAILURE);
+                eprintln!("{}", e);
+            }
+        }
+        std::process::exit(exit_code);
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 3 {
@@ -66,6 +97,7 @@ fn main() {
     match command.as_str() {
         "tokenize" => tokenize(filename),
         "parse" => parse(filename),
+        "evaluate" => evaluate(filename),
         _ => {
             eprintln!("Unknown command: {}", command);
         }
