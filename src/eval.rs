@@ -1,4 +1,4 @@
-use crate::expr::Expr;
+use crate::{expr::Expr, lexer::Token};
 
 // mod visit {
 //     use crate::expr::*;
@@ -24,7 +24,10 @@ impl Evaluator {
 
     fn evaluate_expression(&self, e: &Expr) -> i32 {
         match &e {
-            Expr::Literal(value) => println!("{}", value.lexeme()),
+            Expr::Literal(t @ (Token::Number(_) | Token::String(_))) => {
+                println!("{}", t.literal_trimmed())
+            }
+            Expr::Literal(t) => println!("{}", t.lexeme()),
             _ => todo!(),
         }
         0
