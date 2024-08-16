@@ -1,6 +1,8 @@
 use lazy_static::lazy_static;
 use std::{collections::HashMap, fmt::Display};
 
+use crate::EXIT_OK;
+
 const EXIT_LEXICAL_ERROR: i32 = 65;
 
 const LEFT_PAREN: char = '(';
@@ -77,7 +79,7 @@ lazy_static! {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     LeftParen,
     RightParen,
@@ -193,16 +195,11 @@ impl Lexer {
                 if let Some(token_type) = SINGLE_CHAR_TOKENS.get(&c) {
                     self.token_type.push(token_type.clone());
                 } else if c.is_ascii_digit() {
-                    self.number();
+                    exit_code = self.number();
                 } else if c.is_ascii_alphabetic() || c == '_' {
                     self.identifier();
                 } else {
-                    self.errors.push(LexError {
-                        line: self.line,
-                        column: self.current,
-                        message: format!("Unexpected character: {}", c),
-                    });
-                    exit_code = EXIT_LEXICAL_ERROR;
+                    exit_code = self.log_error(format!("Unexpected character: {}", c).as_str());
                 }
             }
         }
@@ -225,26 +222,33 @@ impl Lexer {
         }
     }
 
-    fn number(&mut self) {
+    fn number(&mut self) -> i32 {
         while self.peek().is_ascii_digit() {
             self.advance();
         }
 
         if self.peek() == '.' && self.peek_next().is_ascii_digit() {
             self.advance();
+            // catches -> 10.x1 where x is an invalid character in a number literal.
+            // if !self.peek().is_ascii_digit() {
+            //     return self.log_error("Expected digit after decimal point");
+            // }
             while self.peek().is_ascii_digit() {
                 self.advance();
             }
         }
 
-        //TODO: Add Lex error for invalid tokens within a number?
+        // check invalid characters directly after otherwise valid number literal
+        // if self.peek().is_alphabetic() || self.peek() == '_' {
+        //     return self.log_error("Invalid character in number literal");
+        // }
 
         let literal = self.source[self.start..self.current].to_string();
         self.token_type.push(Token::Number(literal));
+        EXIT_OK
     }
 
     fn string(&mut self) -> i32 {
-        let mut exit_code = 0;
         while self.peek() != '"' && !self.is_at_end() {
             if self.peek() == '\n' {
                 self.line += 1;
@@ -253,14 +257,7 @@ impl Lexer {
         }
 
         if self.is_at_end() {
-            self.errors.push(LexError {
-                line: self.line,
-                column: self.current,
-                message: "Unterminated string.".to_string(),
-            });
-            exit_code = EXIT_LEXICAL_ERROR;
-
-            return exit_code; // exit without advancing on unterminated str
+            return self.log_error("Unterminated string.");
         }
 
         self.advance(); // closing "
@@ -268,7 +265,7 @@ impl Lexer {
         // trim quotes for literal
         let literal = self.source[self.start + 1..self.current - 1].to_string();
         self.token_type.push(Token::String(literal));
-        exit_code
+        EXIT_OK
     }
 
     fn match_char(&mut self, expected: char) -> bool {
@@ -317,6 +314,15 @@ impl Lexer {
         while self.peek() != '\n' && !self.is_at_end() {
             self.advance();
         }
+    }
+
+    fn log_error(&mut self, message: &str) -> i32 {
+        self.errors.push(LexError {
+            line: self.line,
+            column: self.current,
+            message: message.to_string(),
+        });
+        EXIT_LEXICAL_ERROR
     }
 }
 
