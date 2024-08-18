@@ -77,6 +77,7 @@ impl Evaluator {
         let right_value = self.evaluate_expression(right)?;
 
         match operator {
+            // arithmetic operators
             Token::Plus => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                 // string concatenation
@@ -93,6 +94,23 @@ impl Evaluator {
             },
             Token::Star => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
+                _ => Err(EvalError::NaN),
+            },
+            // relational operators
+            Token::Less => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l < r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::LessEqual => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l <= r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::Greater => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l > r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::GreaterEqual => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
                 _ => Err(EvalError::NaN),
             },
             _ => todo!(),
