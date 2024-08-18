@@ -16,8 +16,9 @@ pub enum Value {
 #[allow(dead_code)]
 pub enum EvalError {
     NaN,
-    InvalidUnaryOp,
-    InvalidBinaryOp,
+    InvalidOperand,
+    InvalidOperands,
+    InvalidOperator,
 }
 
 impl Evaluator {
@@ -65,10 +66,10 @@ impl Evaluator {
         match operator {
             Token::Minus => match right_value {
                 Value::Number(n) => Ok(Value::Number(-n)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperand),
             },
             Token::Bang => Ok(Value::Boolean(!self.is_truthy(&right_value))),
-            _ => Err(EvalError::InvalidUnaryOp),
+            _ => Err(EvalError::InvalidOperator),
         }
     }
 
@@ -82,41 +83,41 @@ impl Evaluator {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                 // string concatenation
                 (Value::String(l), Value::String(r)) => Ok(Value::String(l + &r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::Minus => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::Slash => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::Star => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             // relational operators
             Token::Less => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l < r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::LessEqual => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l <= r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::Greater => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l > r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             Token::GreaterEqual => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
-                _ => Err(EvalError::NaN),
+                _ => Err(EvalError::InvalidOperands),
             },
             // equality
             Token::EqualEqual => Ok(Value::Boolean(self.is_equal(&left_value, &right_value))),
             Token::BangEqual => Ok(Value::Boolean(!self.is_equal(&left_value, &right_value))),
-            _ => todo!(),
+            _ => Err(EvalError::InvalidOperator),
         }
     }
 
@@ -154,8 +155,9 @@ impl Display for EvalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EvalError::NaN => write!(f, "Operand must be a number."),
-            EvalError::InvalidUnaryOp => write!(f, "Unrecognized unary operator."),
-            EvalError::InvalidBinaryOp => write!(f, "Unrecognized binary operator."),
+            EvalError::InvalidOperator => write!(f, "Unrecognized unary operator."),
+            EvalError::InvalidOperand => write!(f, "Operand must be a number."),
+            EvalError::InvalidOperands => write!(f, "Operands must be two numbers or two strings."),
         }
     }
 }
