@@ -13,9 +13,11 @@ pub enum Value {
     String(String),
 }
 
+#[allow(dead_code)]
 pub enum EvalError {
     NaN,
     InvalidUnaryOp,
+    InvalidBinaryOp,
 }
 
 impl Evaluator {
@@ -34,12 +36,27 @@ impl Evaluator {
             Expr::Literal(t) => Ok(self.literal(t)),
             Expr::Grouping(expr) => self.grouping(expr),
             Expr::Unary { operator, right } => self.unary(operator, right),
-            _ => todo!(),
+            Expr::Binary {
+                operator,
+                left,
+                right,
+            } => self.binary(operator, left, right),
         }
     }
 
     fn grouping(&self, e: &Expr) -> Result<Value, EvalError> {
         self.evaluate_expression(e)
+    }
+
+    fn literal(&self, t: &Token) -> Value {
+        match t {
+            // maybe dont do an unwrap here genius
+            Token::Number(n) => Value::Number(n.parse::<f64>().unwrap()),
+            Token::String(s) => Value::String(s.to_string()),
+            Token::True => Value::Boolean(true),
+            Token::False => Value::Boolean(false),
+            _ => Value::Nil,
+        }
     }
 
     fn unary(&self, operator: &Token, right: &Expr) -> Result<Value, EvalError> {
@@ -55,14 +72,24 @@ impl Evaluator {
         }
     }
 
-    fn literal(&self, t: &Token) -> Value {
-        match t {
-            // maybe dont do an unwrap here genius
-            Token::Number(n) => Value::Number(n.parse::<f64>().unwrap()),
-            Token::String(s) => Value::String(s.to_string()),
-            Token::True => Value::Boolean(true),
-            Token::False => Value::Boolean(false),
-            _ => Value::Nil,
+    fn binary(&self, operator: &Token, left: &Expr, right: &Expr) -> Result<Value, EvalError> {
+        let left_value = self.evaluate_expression(left)?;
+        let right_value = self.evaluate_expression(right)?;
+
+        match operator {
+            Token::Minus => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::Slash => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::Star => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
+                _ => Err(EvalError::NaN),
+            },
+            _ => todo!(),
         }
     }
 
@@ -90,7 +117,8 @@ impl Display for EvalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             EvalError::NaN => write!(f, "Operand must be a number."),
-            EvalError::InvalidUnaryOp => write!(f, "Unrecognized operator."),
+            EvalError::InvalidUnaryOp => write!(f, "Unrecognized unary operator."),
+            EvalError::InvalidBinaryOp => write!(f, "Unrecognized binary operator."),
         }
     }
 }
