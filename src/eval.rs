@@ -28,8 +28,13 @@ impl Evaluator {
                 println!("{}", t.literal_trimmed())
             }
             Expr::Literal(t) => println!("{}", t.lexeme()),
+            Expr::Grouping(expr) => self.grouping(expr),
             _ => todo!(),
         }
         0
+    }
+
+    fn grouping(&self, e: &Expr) {
+        self.evaluate_expression(e);
     }
 }
