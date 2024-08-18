@@ -77,8 +77,13 @@ impl Evaluator {
         let right_value = self.evaluate_expression(right)?;
 
         match operator {
+            // arithmetic
             Token::Minus => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
+                _ => Err(EvalError::NaN),
+            },
+            Token::Plus => match (left_value, right_value) {
+                (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                 _ => Err(EvalError::NaN),
             },
             Token::Slash => match (left_value, right_value) {
