@@ -15,9 +15,9 @@ pub enum Value {
 
 #[allow(dead_code)]
 pub enum EvalError {
-    NaN,
-    InvalidOperand,
-    InvalidOperands,
+    MustBeNumber,
+    MustBeNumbers,
+    MustMatch,
     InvalidOperator,
 }
 
@@ -66,7 +66,7 @@ impl Evaluator {
         match operator {
             Token::Minus => match right_value {
                 Value::Number(n) => Ok(Value::Number(-n)),
-                _ => Err(EvalError::InvalidOperand),
+                _ => Err(EvalError::MustBeNumber),
             },
             Token::Bang => Ok(Value::Boolean(!self.is_truthy(&right_value))),
             _ => Err(EvalError::InvalidOperator),
@@ -83,36 +83,36 @@ impl Evaluator {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                 // string concatenation
                 (Value::String(l), Value::String(r)) => Ok(Value::String(l + &r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustMatch),
             },
             Token::Minus => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             Token::Slash => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             Token::Star => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             // relational operators
             Token::Less => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l < r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             Token::LessEqual => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l <= r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             Token::Greater => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l > r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             Token::GreaterEqual => match (left_value, right_value) {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
-                _ => Err(EvalError::InvalidOperands),
+                _ => Err(EvalError::MustBeNumbers),
             },
             // equality
             Token::EqualEqual => Ok(Value::Boolean(self.is_equal(&left_value, &right_value))),
@@ -154,10 +154,10 @@ impl Display for Value {
 impl Display for EvalError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EvalError::NaN => write!(f, "Operand must be a number."),
             EvalError::InvalidOperator => write!(f, "Unrecognized unary operator."),
-            EvalError::InvalidOperand => write!(f, "Operand must be a number."),
-            EvalError::InvalidOperands => write!(f, "Operands must be two numbers or two strings."),
+            EvalError::MustBeNumber => write!(f, "Operand must be a number."),
+            EvalError::MustBeNumbers => write!(f, "Operands must be numbers."),
+            EvalError::MustMatch => write!(f, "Operands must be two numbers or two strings."),
         }
     }
 }
