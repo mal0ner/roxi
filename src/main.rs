@@ -73,7 +73,13 @@ fn evaluate(filename: &str) {
         match parser.parse() {
             Ok(expr) => {
                 let evaluator = Evaluator::new(Box::new(expr));
-                exit_code = exit_code.max(evaluator.evaluate());
+                match evaluator.evaluate() {
+                    Ok(value) => println!("{}", value),
+                    Err(e) => {
+                        eprintln!("{}", e);
+                        exit_code = exit_code.max(EXIT_FAILURE);
+                    }
+                }
             }
             Err(e) => {
                 exit_code = exit_code.max(EXIT_FAILURE);

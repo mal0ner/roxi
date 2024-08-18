@@ -423,13 +423,13 @@ impl Token {
         }
     }
 
-    pub fn literal_trimmed(&self) -> String {
-        match self {
-            Token::String(string) => string.to_string(),
-            Token::Number(number) => format!("{}", number.parse::<f64>().unwrap()),
-            _ => "null".to_string(),
-        }
-    }
+    // pub fn literal_trimmed(&self) -> String {
+    //     match self {
+    //         Token::String(string) => string.to_string(),
+    //         Token::Number(number) => format!("{}", number.parse::<f64>().unwrap()),
+    //         _ => "null".to_string(),
+    //     }
+    // }
 }
 
 impl Display for LexError {
