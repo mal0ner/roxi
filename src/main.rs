@@ -11,7 +11,8 @@ use eval::Evaluator;
 use crate::{lexer::Lexer, parser::Parser};
 
 const EXIT_OK: i32 = 0;
-const EXIT_FAILURE: i32 = 65;
+const EXIT_LEX_ERROR: i32 = 65;
+const EXIT_RUNTIME_ERROR: i32 = 70;
 
 fn tokenize(filename: &str) {
     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
@@ -48,7 +49,7 @@ fn parse(filename: &str) {
                 println!("{}", expr);
             }
             Err(e) => {
-                exit_code = exit_code.max(EXIT_FAILURE);
+                exit_code = exit_code.max(EXIT_LEX_ERROR);
                 eprintln!("{}", e);
             }
         }
@@ -77,12 +78,12 @@ fn evaluate(filename: &str) {
                     Ok(value) => println!("{}", value),
                     Err(e) => {
                         eprintln!("{}", e);
-                        exit_code = exit_code.max(EXIT_FAILURE);
+                        exit_code = exit_code.max(EXIT_RUNTIME_ERROR);
                     }
                 }
             }
             Err(e) => {
-                exit_code = exit_code.max(EXIT_FAILURE);
+                exit_code = exit_code.max(EXIT_LEX_ERROR);
                 eprintln!("{}", e);
             }
         }
