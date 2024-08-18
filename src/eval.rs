@@ -113,6 +113,9 @@ impl Evaluator {
                 (Value::Number(l), Value::Number(r)) => Ok(Value::Boolean(l >= r)),
                 _ => Err(EvalError::NaN),
             },
+            // equality
+            Token::EqualEqual => Ok(Value::Boolean(self.is_equal(&left_value, &right_value))),
+            Token::BangEqual => Ok(Value::Boolean(!self.is_equal(&left_value, &right_value))),
             _ => todo!(),
         }
     }
@@ -122,6 +125,16 @@ impl Evaluator {
             Value::Nil => false,
             Value::Boolean(b) => *b,
             _ => true,
+        }
+    }
+
+    fn is_equal(&self, left: &Value, right: &Value) -> bool {
+        match (left, right) {
+            (Value::Nil, Value::Nil) => true,
+            (Value::Boolean(l), Value::Boolean(r)) => l == r,
+            (Value::Number(l), Value::Number(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
+            _ => false,
         }
     }
 }
