@@ -449,3 +449,26 @@ impl Display for Token {
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Lexer, Token};
+
+    #[test]
+    fn test_empty_input() {
+        let input = String::from("");
+        let mut lexer = Lexer::new(input);
+        let (tokens, errors, _) = lexer.scan_tokens();
+        assert!(errors.is_empty());
+        assert_eq!(tokens, vec![Token::Eof]);
+    }
+
+    #[test]
+    fn test_valid_tokens() {
+        let input = String::from(")");
+        let mut lexer = Lexer::new(input);
+        let (tokens, errors, _) = lexer.scan_tokens();
+        assert!(errors.is_empty());
+        assert_eq!(tokens, vec![Token::RightParen, Token::Eof]);
+    }
+}

@@ -6,9 +6,7 @@ mod parser;
 use std::env;
 use std::fs;
 
-use eval::Evaluator;
-
-use crate::{lexer::Lexer, parser::Parser};
+use crate::{eval::Evaluator, lexer::Lexer, parser::Parser};
 
 const EXIT_OK: i32 = 0;
 const EXIT_LEX_ERROR: i32 = 65;
