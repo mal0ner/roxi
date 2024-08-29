@@ -1,35 +1,126 @@
-for (var i = 1; i < 5; i = i + 1) {
-  print i * i;
+// This is a long Lox file for testing tokenizers
+// It includes various language features and syntax elements
+
+// Variable declarations and assignments
+var a = 1;
+var b = 2.5;
+var c = "Hello, Lox!";
+var d = true;
+var e = nil;
+
+// Arithmetic operations
+var sum = a + b;
+var difference = b - a;
+var product = a * b;
+var quotient = b / a;
+
+// Comparison and logical operations
+var isEqual = a == b;
+var isNotEqual = a != b;
+var isGreater = b > a;
+var isLess = a < b;
+var andResult = true and false;
+var orResult = true or false;
+var notResult = !true;
+
+// Control flow statements
+if (a < b) {
+  print "a is less than b";
+} else {
+  print "a is not less than b";
 }
 
-class Duck {
-  init(name) {
+var i = 0;
+while (i < 5) {
+  print i;
+  i = i + 1;
+}
+
+for (var j = 0; j < 3; j = j + 1) {
+  print "Loop iteration: " + j;
+}
+
+// Functions
+fun greet(name) {
+  print "Hello, " + name + "!";
+}
+
+greet("Lox User");
+
+fun fibonacci(n) {
+  if (n <= 1) return n;
+  return fibonacci(n - 2) + fibonacci(n - 1);
+}
+
+print "Fibonacci of 10 is: " + fibonacci(10);
+
+// Classes and objects
+class Person {
+  init(name, age) {
     this.name = name;
+    this.age = age;
   }
 
-  quack() {
-    print this.name + " quacks";
+  sayHello() {
+    print "Hello, I'm " + this.name + " and I'm " + this.age + " years old.";
   }
 }
 
-var duck = Duck("Waddles");
-duck.quack();
+var person1 = Person("Alice", 30);
+person1.sayHello();
 
-fun make_adder(n) {
-  fun adder(i) {
-    return n + i;
+class Employee < Person {
+  init(name, age, job) {
+    super.init(name, age);
+    this.job = job;
   }
-  return adder;
-}
-var add5 = make_adder(5);
-print add5(1);
-print add5(100);
 
-// Output:
-// 1
-// 4
-// 9
-// 16
-// Waddles quacks
-// 6
-// 105
+  introduce() {
+    super.sayHello();
+    print "I work as a " + this.job + ".";
+  }
+}
+
+var employee1 = Employee("Bob", 35, "Developer");
+employee1.introduce();
+
+// String operations and escaping
+print escapedString;
+
+// Comments
+// This is a single-line comment
+
+
+// Nested blocks and scoping
+{
+  var x = 10;
+  {
+    var y = 20;
+    print x + y;
+  }
+  // print y; // This would cause an error as y is out of scope
+}
+
+// Error handling (this will cause a runtime error if uncommented)
+// print nonexistentVariable;
+
+// Testing operator precedence
+var precedenceTest = 2 + 3 * 4 - 6 / 2;
+print "Precedence test result: " + precedenceTest;
+
+// Testing various number formats
+var integer = 42;
+var float = 3.14159;
+var scientific = 6.022e23;
+var hexadecimal = 0xFF;
+
+// Testing string concatenation
+var firstName = "John";
+var lastName = "Doe";
+var fullName = firstName + " " + lastName;
+print "Full name: " + fullName;
+
+// Testing logical short-circuiting
+var shortCircuit = false and print "This should not be printed";
+
+print "End of test file reached.";
