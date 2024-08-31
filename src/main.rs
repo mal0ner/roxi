@@ -4,36 +4,38 @@ mod lexer;
 mod parser;
 mod position;
 
-use std::env;
-use std::fs;
+use std::{env, fs};
 
-use lexer::Scanner;
-use lexer::Token;
-use position::LineOffsets;
-use position::WithSpan;
-
-use crate::{eval::Evaluator, parser::Parser};
+use crate::{
+    eval::Evaluator,
+    lexer::{Scanner, Token},
+    parser::Parser,
+    position::{LineOffsets, WithSpan},
+};
 
 fn tokenize(filename: &str) {
     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
         eprintln!("Failed to read file {}", filename);
         String::new()
     });
-    let mut scanner = Scanner::new(&file_contents);
-    let offsets = LineOffsets::new(&file_contents);
-    let tokens: Vec<Token> = scanner
-        .scan()
-        .into_iter()
-        .map(WithSpan::into_inner)
-        .collect();
-    for token in tokens {
-        println!("{}", token);
-    }
-    if scanner.has_errors() {
-        let diagnostics = scanner.diagnostics();
-        for diag in diagnostics {
-            let line = offsets.line(diag.span.end);
-            eprintln!("[line {}] Error: {}", line, &diag.message);
+
+    if !file_contents.is_empty() {
+        let mut scanner = Scanner::new(&file_contents);
+        let offsets = LineOffsets::new(&file_contents);
+        let tokens: Vec<Token> = scanner
+            .scan()
+            .into_iter()
+            .map(WithSpan::into_inner)
+            .collect();
+        if scanner.has_errors() {
+            let diagnostics = scanner.diagnostics();
+            for diag in diagnostics {
+                let line = offsets.line(diag.span.end);
+                eprintln!("[line {}] Error: {}", line, &diag.message);
+            }
+        }
+        for token in tokens {
+            println!("{}", token);
         }
     }
 }
