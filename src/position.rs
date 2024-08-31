@@ -137,7 +137,7 @@ impl LineOffsets {
         // gives us an n log n method to find the closest preceding newline for
         // any given bytepos.
         match self.offsets.binary_search(&offset) {
-            Ok(line) => line + 1,
+            Ok(line) => line,
             Err(line) => line,
         }
     }
