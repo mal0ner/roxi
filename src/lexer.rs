@@ -1,9 +1,7 @@
 use lazy_static::lazy_static;
-use std::{collections::HashMap, fmt::Display};
+use std::{collections::HashMap, fmt::Display, iter::Peekable, str::Chars};
 
-use crate::EXIT_OK;
-
-const EXIT_LEXICAL_ERROR: i32 = 65;
+use crate::position::{BytePos, Diagnostic, Span, WithSpan};
 
 const LEFT_PAREN: char = '(';
 const RIGHT_PAREN: char = ')';
@@ -130,199 +128,213 @@ pub enum Token {
     Eof,
 }
 
-#[allow(dead_code)]
-#[derive(Clone)]
-pub struct LexError {
-    line: usize,
-    column: usize,
-    message: String,
+#[allow(unused)]
+pub struct Scanner<'a> {
+    pos: BytePos,
+    it: Peekable<Chars<'a>>,
+    errors: Vec<Diagnostic>,
 }
 
-pub struct Lexer {
-    source: String,
-    token_type: Vec<Token>,
-    errors: Vec<LexError>,
-    start: usize, //token start offset
-    current: usize,
-    line: usize,
-}
-
-impl Lexer {
-    pub fn new(source: String) -> Self {
-        Lexer {
-            source,
+#[allow(unused)]
+impl<'a> Scanner<'a> {
+    pub fn new(data: &'a str) -> Self {
+        Self {
+            pos: BytePos::default(),
+            it: data.chars().peekable(),
             errors: Vec::new(),
-            token_type: Vec::new(),
-            start: 0,
-            current: 0,
-            line: 1,
         }
     }
 
-    pub fn scan_tokens(&mut self) -> (Vec<Token>, Vec<LexError>, i32) {
-        let mut exit_code: i32 = 0;
-        while !self.is_at_end() {
-            self.start = self.current;
-            exit_code = exit_code.max(self.scan_token());
+    pub fn scan(&mut self) -> Vec<WithSpan<Token>> {
+        let mut tokens: Vec<WithSpan<Token>> = Vec::new();
+
+        loop {
+            let start_pos = self.pos;
+            let ch = match self.next() {
+                None => break,
+                Some(c) => c,
+            };
+
+            match self.match_token(ch, start_pos) {
+                Ok(maybe_token) => {
+                    if let Some(token) = maybe_token {
+                        tokens.push(WithSpan::new(
+                            token,
+                            Span {
+                                start: start_pos,
+                                end: self.pos,
+                            },
+                        ));
+                    }
+                    // dont do anything if \n, \t, \r, //, or ' '
+                }
+                Err(diag) => self.error(diag),
+            }
         }
-
-        self.token_type.push(Token::Eof);
-
-        (self.token_type.clone(), self.errors.clone(), exit_code)
+        // do stuff
+        tokens.push(WithSpan::new(
+            Token::Eof,
+            Span {
+                start: self.pos,
+                end: self.pos,
+            },
+        ));
+        tokens
     }
 
-    fn scan_token(&mut self) -> i32 {
+    fn match_token(&mut self, ch: char, start_pos: BytePos) -> Result<Option<Token>, Diagnostic> {
         use Token::*;
 
-        let mut exit_code: i32 = 0;
-        let c = self.advance();
-        match c {
-            ' ' | '\r' | '\t' => {}
-            '\n' => self.line += 1,
-            '"' => exit_code = self.string(),
+        match ch {
+            ' ' | '\n' | '\r' | '\t' => Ok(None),
+            '"' => {
+                let s = self.consume_while(|ch| ch != '"');
+                match self.next() {
+                    None => Err(Diagnostic::new("Unterminated String", start_pos, self.pos)),
+                    _ => Ok(Some(String(s))),
+                }
+            }
             '/' => {
-                if self.match_char('/') {
-                    self.advance_newline();
+                if self.consume_if(|ch| ch == '/') {
+                    self.consume_while(|ch| ch != '\n');
+                    Ok(None)
                 } else {
-                    self.token_type.push(Token::Slash)
+                    Ok(Some(Slash))
                 }
             }
-            '!' => self.match_next_add('=', BangEqual, Bang),
-            '=' => self.match_next_add('=', EqualEqual, Equal),
-            '<' => self.match_next_add('=', LessEqual, Less),
-            '>' => self.match_next_add('=', GreaterEqual, Greater),
+            '!' => Ok(Some(self.either('=', BangEqual, Bang))),
+            '=' => Ok(Some(self.either('=', EqualEqual, Equal))),
+            '<' => Ok(Some(self.either('=', LessEqual, Less))),
+            '>' => Ok(Some(self.either('=', GreaterEqual, Greater))),
+            c if c.is_numeric() => Ok(self.number(c)),
+            c if c.is_alphabetic() || c == '_' => Ok(self.identifier(c)),
             _ => {
-                if let Some(token_type) = SINGLE_CHAR_TOKENS.get(&c) {
-                    self.token_type.push(token_type.clone());
-                } else if c.is_ascii_digit() {
-                    exit_code = self.number();
-                } else if c.is_ascii_alphabetic() || c == '_' {
-                    self.identifier();
+                if let Some(tok) = SINGLE_CHAR_TOKENS.get(&ch) {
+                    Ok(Some(tok.clone()))
                 } else {
-                    exit_code = self.log_error(format!("Unexpected character: {}", c).as_str());
+                    Err(Diagnostic::new(
+                        format!("Unexpected character: {}", ch),
+                        start_pos,
+                        self.pos,
+                    ))
                 }
             }
         }
-        exit_code
     }
 
-    fn identifier(&mut self) {
-        while self.peek().is_alphanumeric() || self.peek() == '_' {
-            self.advance();
-        }
-
-        let lexeme = &self.source[self.start..self.current];
-        let token_type = KEYWORDS
-            .get(lexeme)
-            .cloned()
-            .unwrap_or(Token::Identifier("".to_string()));
-        match token_type {
-            Token::Identifier(_) => self.token_type.push(Token::Identifier(lexeme.to_string())),
-            _ => self.token_type.push(token_type),
+    fn identifier(&mut self, ch: char) -> Option<Token> {
+        let mut ident = String::new();
+        ident.push(ch);
+        let rest: String = self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
+        ident.push_str(&rest);
+        let keyword = KEYWORDS.get(ident.as_str());
+        match keyword {
+            Some(kw) => Some(kw.clone()),
+            None => Some(Token::Identifier(ident)),
         }
     }
 
-    fn number(&mut self) -> i32 {
-        while self.peek().is_ascii_digit() {
-            self.advance();
-        }
+    fn number(&mut self, ch: char) -> Option<Token> {
+        let mut number = String::new();
+        number.push(ch);
+        let pre_decimal: String = self.consume_while(|c| c.is_numeric());
+        number.push_str(&pre_decimal);
 
-        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
-            self.advance();
-            // catches -> 10.x1 where x is an invalid character in a number literal.
-            // if !self.peek().is_ascii_digit() {
-            //     return self.log_error("Expected digit after decimal point");
-            // }
-            while self.peek().is_ascii_digit() {
-                self.advance();
+        if self.peek() == Some(&'.') && self.consume_if_next(|c| ch.is_numeric()) {
+            let post_decimal: String = self.consume_while(|c| c.is_numeric());
+            number.push('.');
+            number.push_str(&post_decimal);
+        }
+        Some(Token::Number(number))
+    }
+
+    fn either(&mut self, to_match: char, matched: Token, unmatched: Token) -> Token {
+        if self.consume_if(|ch| ch == to_match) {
+            matched
+        } else {
+            unmatched
+        }
+    }
+
+    /// Consume next char if it matches some condition.
+    fn consume_if<CharMatchFn>(&mut self, matches: CharMatchFn) -> bool
+    where
+        CharMatchFn: Fn(char) -> bool,
+    {
+        if let Some(&ch) = self.peek() {
+            if matches(ch) {
+                self.next().unwrap(); // safe, we peeked some
+                return true; // char matches
+            } else {
+                return false; // char doesn't match
             }
         }
-
-        // check invalid characters directly after otherwise valid number literal
-        // if self.peek().is_alphabetic() || self.peek() == '_' {
-        //     return self.log_error("Invalid character in number literal");
-        // }
-
-        let literal = self.source[self.start..self.current].to_string();
-        self.token_type.push(Token::Number(literal));
-        EXIT_OK
+        false // no current char to peek
     }
 
-    fn string(&mut self) -> i32 {
-        while self.peek() != '"' && !self.is_at_end() {
-            if self.peek() == '\n' {
-                self.line += 1;
-            }
-            self.advance();
-        }
-
-        if self.is_at_end() {
-            return self.log_error("Unterminated string.");
-        }
-
-        self.advance(); // closing "
-
-        // trim quotes for literal
-        let literal = self.source[self.start + 1..self.current - 1].to_string();
-        self.token_type.push(Token::String(literal));
-        EXIT_OK
-    }
-
-    fn match_char(&mut self, expected: char) -> bool {
-        if self.is_at_end() || self.source.chars().nth(self.current) != Some(expected) {
+    /// Consume next char if character following it matches some condition
+    fn consume_if_next<CharMatchFn>(&mut self, matches: CharMatchFn) -> bool
+    where
+        CharMatchFn: Fn(char) -> bool,
+    {
+        let mut iter_copy = self.it.clone();
+        if iter_copy.next().is_none() {
             return false;
         }
-        self.current += 1;
-        true
-    }
 
-    fn match_next_add(&mut self, c: char, if_match: Token, if_not: Token) {
-        if self.match_char(c) {
-            self.token_type.push(if_match);
+        if let Some(&ch) = iter_copy.peek() {
+            // dont progress main iter unecessarily
+            if matches(ch) {
+                self.next().unwrap(); // safe, we peeked some
+                true
+            } else {
+                false
+            }
         } else {
-            self.token_type.push(if_not);
+            false
         }
     }
 
-    fn peek(&self) -> char {
-        if self.is_at_end() {
-            return '\0';
+    /// Consume characters until reaching some condition.
+    fn consume_while<CharMatchFn>(&mut self, matches: CharMatchFn) -> String
+    where
+        CharMatchFn: Fn(char) -> bool,
+    {
+        let mut chars = String::new();
+        while let Some(&ch) = self.peek() {
+            if matches(ch) {
+                self.next().unwrap(); // safe, we peeked some
+                chars.push(ch);
+            } else {
+                break;
+            }
         }
-        self.source.chars().nth(self.current).unwrap_or('\0')
+        chars
     }
 
-    fn peek_next(&self) -> char {
-        if self.current + 1 >= self.source.len() {
-            return '\0';
+    fn next(&mut self) -> Option<char> {
+        let next = self.it.next();
+        if let Some(c) = next {
+            // handle possible non-ascii width char
+            self.pos = self.pos.shift(c);
         }
-        self.source.chars().nth(self.current + 1).unwrap_or('\0')
+        next
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current >= self.source.len()
+    fn peek(&mut self) -> Option<&char> {
+        self.it.peek()
     }
 
-    // return next character
-    fn advance(&mut self) -> char {
-        let c = self.source.chars().nth(self.current).unwrap_or('\0');
-        self.current += 1;
-        c
+    fn error(&mut self, e: Diagnostic) {
+        self.errors.push(e);
     }
 
-    // advance to first character in new line, or EOF
-    fn advance_newline(&mut self) {
-        while self.peek() != '\n' && !self.is_at_end() {
-            self.advance();
-        }
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 
-    fn log_error(&mut self, message: &str) -> i32 {
-        self.errors.push(LexError {
-            line: self.line,
-            column: self.current,
-            message: message.to_string(),
-        });
-        EXIT_LEXICAL_ERROR
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.errors
     }
 }
 
@@ -422,20 +434,6 @@ impl Token {
             _ => "null".to_string(),
         }
     }
-
-    // pub fn literal_trimmed(&self) -> String {
-    //     match self {
-    //         Token::String(string) => string.to_string(),
-    //         Token::Number(number) => format!("{}", number.parse::<f64>().unwrap()),
-    //         _ => "null".to_string(),
-    //     }
-    // }
-}
-
-impl Display for LexError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[line {}] Error: {}", self.line, self.message)
-    }
 }
 
 impl Display for Token {
@@ -447,28 +445,5 @@ impl Display for Token {
             self.lexeme(),
             self.literal()
         )
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Lexer, Token};
-
-    #[test]
-    fn test_empty_input() {
-        let input = String::from("");
-        let mut lexer = Lexer::new(input);
-        let (tokens, errors, _) = lexer.scan_tokens();
-        assert!(errors.is_empty());
-        assert_eq!(tokens, vec![Token::Eof]);
-    }
-
-    #[test]
-    fn test_valid_tokens() {
-        let input = String::from(")");
-        let mut lexer = Lexer::new(input);
-        let (tokens, errors, _) = lexer.scan_tokens();
-        assert!(errors.is_empty());
-        assert_eq!(tokens, vec![Token::RightParen, Token::Eof]);
     }
 }

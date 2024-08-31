@@ -2,30 +2,40 @@ mod eval;
 mod expr;
 mod lexer;
 mod parser;
+mod position;
 
 use std::env;
 use std::fs;
 
-use crate::{eval::Evaluator, lexer::Lexer, parser::Parser};
+use lexer::Scanner;
+use lexer::Token;
+use position::LineOffsets;
+use position::WithSpan;
 
-const EXIT_OK: i32 = 0;
-const EXIT_LEX_ERROR: i32 = 65;
-const EXIT_RUNTIME_ERROR: i32 = 70;
+use crate::{eval::Evaluator, parser::Parser};
 
 fn tokenize(filename: &str) {
     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
         eprintln!("Failed to read file {}", filename);
         String::new()
     });
-    let mut lex = Lexer::new(file_contents);
-    let (tokens, errors, exit_code) = lex.scan_tokens();
+    let mut scanner = Scanner::new(&file_contents);
+    let offsets = LineOffsets::new(&file_contents);
+    let tokens: Vec<Token> = scanner
+        .scan()
+        .into_iter()
+        .map(WithSpan::into_inner)
+        .collect();
     for token in tokens {
         println!("{}", token);
     }
-    for error in errors {
-        eprintln!("{}", error);
+    if scanner.has_errors() {
+        let diagnostics = scanner.diagnostics();
+        for diag in diagnostics {
+            let line = offsets.line(diag.span.end);
+            eprintln!("[line {}] Error: {}", line, &diag.message);
+        }
     }
-    std::process::exit(exit_code);
 }
 
 fn parse(filename: &str) {
@@ -35,10 +45,13 @@ fn parse(filename: &str) {
     });
 
     if !file_contents.is_empty() {
-        let mut lex = Lexer::new(file_contents);
-        let mut exit_code: i32 = EXIT_OK;
-        let (tokens, _, exit_lexer) = lex.scan_tokens();
-        exit_code = exit_code.max(exit_lexer);
+        let mut scanner = Scanner::new(&file_contents);
+        let _offsets = LineOffsets::new(&file_contents);
+        let tokens: Vec<Token> = scanner
+            .scan()
+            .into_iter()
+            .map(WithSpan::into_inner)
+            .collect();
 
         let mut parser = Parser::new(tokens);
 
@@ -47,11 +60,9 @@ fn parse(filename: &str) {
                 println!("{}", expr);
             }
             Err(e) => {
-                exit_code = exit_code.max(EXIT_LEX_ERROR);
                 eprintln!("{}", e);
             }
         }
-        std::process::exit(exit_code);
     }
 }
 
@@ -62,10 +73,13 @@ fn evaluate(filename: &str) {
     });
 
     if !file_contents.is_empty() {
-        let mut lex = Lexer::new(file_contents);
-        let mut exit_code: i32 = EXIT_OK;
-        let (tokens, _, exit_lexer) = lex.scan_tokens();
-        exit_code = exit_code.max(exit_lexer);
+        let mut scanner = Scanner::new(&file_contents);
+        let _offsets = LineOffsets::new(&file_contents);
+        let tokens: Vec<Token> = scanner
+            .scan()
+            .into_iter()
+            .map(WithSpan::into_inner)
+            .collect();
 
         let mut parser = Parser::new(tokens);
 
@@ -76,16 +90,13 @@ fn evaluate(filename: &str) {
                     Ok(value) => println!("{}", value),
                     Err(e) => {
                         eprintln!("{}", e);
-                        exit_code = exit_code.max(EXIT_RUNTIME_ERROR);
                     }
                 }
             }
             Err(e) => {
-                exit_code = exit_code.max(EXIT_LEX_ERROR);
                 eprintln!("{}", e);
             }
         }
-        std::process::exit(exit_code);
     }
 }
 
