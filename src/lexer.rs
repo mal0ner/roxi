@@ -132,7 +132,7 @@ pub enum Token {
 pub struct Scanner<'a> {
     pos: BytePos,
     it: Peekable<Chars<'a>>,
-    errors: Vec<Diagnostic>,
+    diagnostics: Vec<Diagnostic>,
 }
 
 #[allow(unused)]
@@ -141,7 +141,7 @@ impl<'a> Scanner<'a> {
         Self {
             pos: BytePos::default(),
             it: data.chars().peekable(),
-            errors: Vec::new(),
+            diagnostics: Vec::new(),
         }
     }
 
@@ -326,15 +326,15 @@ impl<'a> Scanner<'a> {
     }
 
     fn error(&mut self, e: Diagnostic) {
-        self.errors.push(e);
+        self.diagnostics.push(e);
     }
 
     pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
+        !self.diagnostics.is_empty()
     }
 
     pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.errors
+        &self.diagnostics
     }
 }
 
