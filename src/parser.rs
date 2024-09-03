@@ -1,157 +1,68 @@
-use std::fmt::Display;
+use crate::{
+    lexer::Token,
+    position::{Diagnostic, Span, WithSpan},
+};
 
-use crate::{expr::Expr, lexer::Token};
-
-#[allow(dead_code)]
-pub struct Parser {
-    tokens: Vec<Token>,
-    errors: Vec<ParseError>,
+pub struct Parser<'a> {
+    tokens: &'a [WithSpan<Token>],
     current: usize,
+    diagnostics: Vec<Diagnostic>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ParseError {
-    message: String,
-}
-
-impl Parser {
-    pub fn new(tokens: Vec<Token>) -> Self {
+impl<'a> Parser<'a> {
+    pub fn new(tokens: &'a [WithSpan<Token>]) -> Self {
         Self {
             tokens,
-            errors: Vec::new(),
             current: 0,
+            diagnostics: Vec::new(),
         }
     }
 
-    pub fn parse(&mut self) -> Result<Expr, ParseError> {
-        self.expression()
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.diagnostics
     }
 
-    fn expression(&mut self) -> Result<Expr, ParseError> {
-        self.equality()
-    }
-
-    fn equality(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.comparison()?;
-        while matches!(self.peek(), Token::BangEqual | Token::EqualEqual) {
-            let operator = self.advance();
-            let right = self.comparison()?;
-            expr = Expr::Binary {
-                operator,
-                left: Box::new(expr),
-                right: Box::new(right),
-            }
-        }
-        Ok(expr)
-    }
-
-    fn comparison(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.term()?;
-        while matches!(
-            self.peek(),
-            Token::Greater | Token::GreaterEqual | Token::Less | Token::LessEqual
-        ) {
-            let operator = self.advance();
-            let right = self.term()?;
-            expr = Expr::Binary {
-                operator,
-                left: Box::new(expr),
-                right: Box::new(right),
-            }
-        }
-        Ok(expr)
-    }
-
-    fn term(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.factor()?;
-        while matches!(self.peek(), Token::Plus | Token::Minus) {
-            let operator = self.advance();
-            let right = self.factor()?;
-            expr = Expr::Binary {
-                operator,
-                left: Box::new(expr),
-                right: Box::new(right),
-            };
-        }
-        Ok(expr)
-    }
-
-    fn factor(&mut self) -> Result<Expr, ParseError> {
-        let mut expr = self.unary()?;
-        while matches!(self.peek(), Token::Slash | Token::Star) {
-            let operator = self.advance();
-            let right = self.unary()?;
-            expr = Expr::Binary {
-                operator,
-                left: Box::new(expr),
-                right: Box::new(right),
-            };
-        }
-        Ok(expr)
-    }
-
-    fn unary(&mut self) -> Result<Expr, ParseError> {
-        if matches!(self.peek(), Token::Minus | Token::Bang) {
-            let operator = self.advance();
-            let rhs = self.unary()?;
-            return Ok(Expr::Unary {
-                operator,
-                right: Box::new(rhs),
-            });
-        }
-        self.primary()
-    }
-
-    fn primary(&mut self) -> Result<Expr, ParseError> {
-        if matches!(
-            self.peek(),
-            Token::True | Token::False | Token::Nil | Token::Number(_) | Token::String(_)
-        ) {
-            return Ok(Expr::Literal(self.advance()));
-        }
-        if matches!(self.peek(), Token::LeftParen) {
-            self.advance();
-            let expr = self.expression()?; // consume interior expr
-            if !self.matches(Token::RightParen) {
-                return Err(ParseError {
-                    message: "Unmatched parentheses.".to_string(),
-                });
-            }
-            self.advance();
-            return Ok(Expr::Grouping(Box::new(expr)));
-        }
-
-        Err(ParseError {
-            message: "missing expression".to_string(),
+    pub fn error(&mut self, message: &str, span: Span) {
+        self.diagnostics.push(Diagnostic {
+            message: message.to_string(),
+            span,
         })
     }
 
-    fn advance(&mut self) -> Token {
-        if !self.is_at_end() {
-            self.current += 1;
-        }
-        self.previous()
-    }
-
-    fn matches(&self, expected: Token) -> bool {
-        expected == *self.peek()
-    }
-
-    fn is_at_end(&self) -> bool {
+    pub fn is_at_end(&self) -> bool {
         self.current >= self.tokens.len()
     }
 
-    fn peek(&self) -> &Token {
-        &self.tokens[self.current]
+    /// Retrieves interior Token from slice of WithSpan<Token>
+    pub fn peek(&self) -> Option<Token> {
+        // this feels weird, but I like the idea of keeping the tokens
+        // as a slice since we never need to modify, and I'm pretty sure
+        // the clone on the enum variant in the From Impl is very cheap
+        self.tokens.get(self.current).map(Token::from)
     }
 
-    fn previous(&self) -> Token {
-        self.tokens[self.current - 1].clone()
+    pub fn peek_with_span(&self) -> Option<&'a WithSpan<Token>> {
+        self.tokens.get(self.current)
     }
-}
 
-impl Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Error: {}", self.message)
+    /// Returns span of current token
+    pub fn current_span(&self) -> Span {
+        self.tokens
+            .get(self.current)
+            .map_or(Span::empty(), |t| t.span)
+    }
+
+    pub fn advance(&mut self) -> WithSpan<Token> {
+        // achtung: could panic! but also I dont think so
+        let token = self.tokens.get(self.current).unwrap().clone();
+        if !self.is_at_end() {
+            self.current += 1;
+        }
+        token
+    }
+
+    pub fn matches(&self, expected: Token) -> bool {
+        expected == self.peek().unwrap()
+        // I am a criminal --------^
     }
 }

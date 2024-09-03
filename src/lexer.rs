@@ -436,6 +436,18 @@ impl Token {
     }
 }
 
+impl From<&WithSpan<Token>> for Token {
+    fn from(with_span: &WithSpan<Token>) -> Self {
+        with_span.value.clone()
+    }
+}
+
+impl From<WithSpan<Token>> for Token {
+    fn from(with_span: WithSpan<Token>) -> Self {
+        with_span.value
+    }
+}
+
 impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
