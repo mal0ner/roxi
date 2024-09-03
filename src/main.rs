@@ -4,36 +4,38 @@ mod lexer;
 mod parser;
 mod position;
 
-use std::env;
-use std::fs;
+use std::{env, fs};
 
-use lexer::Scanner;
-use lexer::Token;
-use position::LineOffsets;
-use position::WithSpan;
-
-use crate::{eval::Evaluator, parser::Parser};
+use crate::{
+    // eval::Evaluator,
+    lexer::{Scanner, Token},
+    parser::Parser,
+    position::{LineOffsets, WithSpan},
+};
 
 fn tokenize(filename: &str) {
     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
         eprintln!("Failed to read file {}", filename);
         String::new()
     });
-    let mut scanner = Scanner::new(&file_contents);
-    let offsets = LineOffsets::new(&file_contents);
-    let tokens: Vec<Token> = scanner
-        .scan()
-        .into_iter()
-        .map(WithSpan::into_inner)
-        .collect();
-    for token in tokens {
-        println!("{}", token);
-    }
-    if scanner.has_errors() {
-        let diagnostics = scanner.diagnostics();
-        for diag in diagnostics {
-            let line = offsets.line(diag.span.end);
-            eprintln!("[line {}] Error: {}", line, &diag.message);
+
+    if !file_contents.is_empty() {
+        let mut scanner = Scanner::new(&file_contents);
+        let offsets = LineOffsets::new(&file_contents);
+        let tokens: Vec<Token> = scanner
+            .scan()
+            .into_iter()
+            .map(WithSpan::into_inner)
+            .collect();
+        if scanner.has_errors() {
+            let diagnostics = scanner.diagnostics();
+            for diag in diagnostics {
+                let line = offsets.line(diag.span.end);
+                eprintln!("[line {}] Error: {}", line, &diag.message);
+            }
+        }
+        for token in tokens {
+            println!("{}", token);
         }
     }
 }
@@ -46,59 +48,54 @@ fn parse(filename: &str) {
 
     if !file_contents.is_empty() {
         let mut scanner = Scanner::new(&file_contents);
-        let _offsets = LineOffsets::new(&file_contents);
-        let tokens: Vec<Token> = scanner
-            .scan()
-            .into_iter()
-            .map(WithSpan::into_inner)
-            .collect();
+        let offsets = LineOffsets::new(&file_contents);
+        let tokens: Vec<WithSpan<Token>> = scanner.scan().into_iter().collect();
 
-        let mut parser = Parser::new(tokens);
+        let mut parser = Parser::new(&tokens);
 
-        match parser.parse() {
-            Ok(expr) => {
-                println!("{}", expr);
+        match expr::parse(&mut parser) {
+            Ok(ast) => {
+                println!("{}", ast);
             }
-            Err(e) => {
-                eprintln!("{}", e);
-            }
-        }
-    }
-}
-
-fn evaluate(filename: &str) {
-    let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
-        eprintln!("Failed to read file {}", filename);
-        String::new()
-    });
-
-    if !file_contents.is_empty() {
-        let mut scanner = Scanner::new(&file_contents);
-        let _offsets = LineOffsets::new(&file_contents);
-        let tokens: Vec<Token> = scanner
-            .scan()
-            .into_iter()
-            .map(WithSpan::into_inner)
-            .collect();
-
-        let mut parser = Parser::new(tokens);
-
-        match parser.parse() {
-            Ok(expr) => {
-                let evaluator = Evaluator::new(Box::new(expr));
-                match evaluator.evaluate() {
-                    Ok(value) => println!("{}", value),
-                    Err(e) => {
-                        eprintln!("{}", e);
-                    }
+            Err(_) => {
+                for diag in parser.diagnostics() {
+                    let line = offsets.line(diag.span.end);
+                    eprintln!("[line {}] Error: {}", line, &diag.message);
                 }
             }
-            Err(e) => {
-                eprintln!("{}", e);
-            }
         }
     }
 }
+
+// fn evaluate(filename: &str) {
+//     let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+//         eprintln!("Failed to read file {}", filename);
+//         String::new()
+//     });
+//
+//     if !file_contents.is_empty() {
+//         let mut scanner = Scanner::new(&file_contents);
+//         let _offsets = LineOffsets::new(&file_contents);
+//         let tokens: Vec<WithSpan<Token>> = scanner.scan().into_iter().collect();
+//
+//         let mut parser = Parser::new(&tokens);
+//
+//         match expr::parse(&mut parser) {
+//             Ok(expr) => {
+//                 let evaluator = Evaluator::new(Box::new(expr));
+//                 match evaluator.evaluate() {
+//                     Ok(value) => println!("{}", value),
+//                     Err(e) => {
+//                         eprintln!("{}", e);
+//                     }
+//                 }
+//             }
+//             Err(e) => {
+//                 eprintln!("{}", e);
+//             }
+//         }
+//     }
+// }
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -113,7 +110,7 @@ fn main() {
     match command.as_str() {
         "tokenize" => tokenize(filename),
         "parse" => parse(filename),
-        "evaluate" => evaluate(filename),
+        // "evaluate" => evaluate(filename),
         _ => {
             eprintln!("Unknown command: {}", command);
         }

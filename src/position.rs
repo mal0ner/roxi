@@ -45,6 +45,7 @@ impl Diagnostic {
 
 /// Wrapper for various types within the interpreter. Allows for keeping the starting
 /// and ending BytePosition of the value.
+#[derive(Debug)]
 pub struct WithSpan<T> {
     pub value: T,
     pub span: Span,
@@ -68,6 +69,15 @@ impl<T> WithSpan<T> {
     /// Extract value from WithSpan
     pub fn into_inner(self) -> T {
         self.value
+    }
+}
+
+impl<T: Clone> Clone for WithSpan<T> {
+    fn clone(&self) -> Self {
+        WithSpan {
+            value: self.value.clone(),
+            span: self.span,
+        }
     }
 }
 
@@ -137,7 +147,7 @@ impl LineOffsets {
         // gives us an n log n method to find the closest preceding newline for
         // any given bytepos.
         match self.offsets.binary_search(&offset) {
-            Ok(line) => line + 1,
+            Ok(line) => line,
             Err(line) => line,
         }
     }
