@@ -24,7 +24,7 @@ Tokenize a lox file:
 #   return fibonacci(n - 2) + fibonacci(n - 1);
 # }
 
-cargo run tokenize test.lox
+$ cargo run tokenize test.lox
 
 # OUTPUT
 # IDENTIFIER fibonacci null
@@ -64,12 +64,22 @@ Parse a lox file:
 # ("a" + "b" + "c") * 3 == "abcabcabc" ==
 # ((((1 + 1) + 1) + 1) + 1) == 5
 
-cargo run parse test.lox
+$ cargo run parse test.lox
 
 # OUTPUT
 # (== (== (== (== (== (== (== (== (== (!= (== (== (== (== (== (== (== (== (== (== (== (== (== (== (== (!= (== (== (== (== (== (!= (== (== (== (== (== (!= # (group (== (- (* (group (+ 10.0 5.0)) 3.0) (/ 4.0 2.0)) 42.0)) true) (! false)) (< (> (<= (>= 7.0 6.0) 5.0) 4.0) (+ 3.0 (* (- 1.0) hello)))) nil) (>= (/ # (* (group (- 100.0 50.0)) 2.0) (group (+ 4.0 1.0))) 10.0)) (group (== world world))) false) (! (group (< 5.0 3.0)))) true) (- (* 7.0 (group (+ 3.0 
 # 2.0))) 1.0)) 34.0) (group (== nil nil))) (group (!= 10.0 10.0))) (- (+ (- (group (- (group (- 10.0))))) (* (/ 20.0 4.0) 2.0)) 15.0)) (- 10.0)) (+ (+   
 # concatenation  ) works)) concatenation works) (! (! (! true)))) false) (* (group (- (+ (/ (group (- (* (group (+ 1.0 2.0)) 3.0) 4.0)) 5.0) 6.0) 7.0))   # 8.0)) 32.0) (group (>= (>= (>= (>= 9.0 8.0) 7.0) 6.0) 5.0))) true) nested) (group (== groups (group (== are (group (== fun fun))))))) (group (> (< (> (< # 1.0 2.0) 3.0) 4.0) 5.0))) false) nil) nil) (group (!= true false))) (* (group (+ 123.45 67.89)) (group (- 10.5 5.5)))) 955.7) (! (group (! (group (!     # (group false))))))) true) (* (group (+ (+ a b) c)) 3.0)) abcabcabc) (group (+ (group (+ (group (+ (group (+ 1.0 1.0)) 1.0)) 1.0)) 1.0))) 5.0)
+```
+
+```sh
+# test.lox
+# ("a" + "pple") == "apple"
+
+$ cargo run evaluate t.lox
+
+# OUTPUT
+true
 ```
 
 ## Working Features
@@ -86,10 +96,10 @@ cargo run parse test.lox
   - [ ] Functions
   - [ ] Classes
 
-### Evaluator (BROKEN RIGHT NOW)
+### Evaluator
   - [x] Boolean expressions
-  - [ ] Numeric expressions
-  - [ ] String concatenation
+  - [x] Numeric expressions
+  - [x] String concatenation
 
 ## Coming Soon...
 - Environment and State
